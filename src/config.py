@@ -14,8 +14,10 @@ VECTOR_DB_DIR = BASE_DIR / os.getenv("VECTOR_DB_DIR", "data/vectorstore")
 DATA_DIR.mkdir(exist_ok=True)
 
 # LLM Configurations
-# Options: "local" (HuggingFace local model), "gemini", "openai"
+# Options: "local" (HuggingFace local model), "claude", "gemini", "openai"
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "local").lower()
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
+ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-opus-4-8")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 

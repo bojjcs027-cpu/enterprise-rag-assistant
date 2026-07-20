@@ -177,7 +177,9 @@ async def get_status(user: CurrentUser):
     provider   = config.LLM_PROVIDER
 
     # Detect whether we are actually running a real model or a fallback
-    if provider == "gemini" and not config.GEMINI_API_KEY:
+    if provider == "claude" and not config.ANTHROPIC_API_KEY:
+        effective_provider = "local"
+    elif provider == "gemini" and not config.GEMINI_API_KEY:
         effective_provider = "local"
     elif provider == "openai" and not config.OPENAI_API_KEY:
         effective_provider = "local"

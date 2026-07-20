@@ -60,6 +60,11 @@ def patched_service(session_factory, tmp_path, monkeypatch):
 
     class FakeRetriever:
         all_documents = []
+        # When None, incremental ops report "not applicable" and the service
+        # falls back to the full reindex stub (the behaviour most tests
+        # exercise). Tests can set it to True to simulate the fast path.
+        incremental_result = None
+        incremental_calls = []
 
         def initialize(self, force_reindex=False):
             pass
@@ -68,6 +73,19 @@ def patched_service(session_factory, tmp_path, monkeypatch):
             for stage in ("chunking", "embedding", "indexing"):
                 if progress_callback:
                     progress_callback(stage)
+
+        def add_files_incremental(self, filenames, progress_callback=None):
+            self.incremental_calls.append(("add", list(filenames)))
+            if self.incremental_result:
+                for stage in ("chunking", "embedding", "indexing"):
+                    if progress_callback:
+                        progress_callback(stage)
+                return True
+            return False
+
+        def remove_file_incremental(self, filename):
+            self.incremental_calls.append(("remove", filename))
+            return bool(self.incremental_result)
 
     fake = FakeRetriever()
     monkeypatch.setattr(service_module.retriever, "retriever_instance", fake)
@@ -211,6 +229,25 @@ class TestProcessBatch:
             rec = DocumentRepository(db).get(ids[0])
             assert rec.status == DocumentStatus.FAILED
             assert "index exploded" in rec.error_message
+
+    def test_incremental_path_skips_full_reindex(
+            self, patched_service, session_factory, admin_user, monkeypatch):
+        svc = service_module.library_service
+        ids, _ = svc.save_uploads([("c.txt", b"gamma")], admin_user)
+
+        patched_service.incremental_result = True
+        patched_service.incremental_calls = []
+
+        def full_reindex_forbidden(progress_callback=None):
+            raise AssertionError("full reindex must not run when incremental succeeds")
+        monkeypatch.setattr(patched_service, "reindex", full_reindex_forbidden)
+
+        svc.process_batch(ids)
+
+        assert ("add", ["c.txt"]) in patched_service.incremental_calls
+        with session_factory() as db:
+            rec = DocumentRepository(db).get(ids[0])
+            assert rec.status == DocumentStatus.COMPLETED
 
 
 # ---------------------------------------------------------------------------

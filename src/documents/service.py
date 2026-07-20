@@ -169,9 +169,16 @@ class LibraryService:
                 logger.info("[Library] Batch %s -> %s", ids, stage)
 
         try:
+            with SessionLocal() as db:
+                filenames = [r.filename for r in DocumentRepository(db).get_many(ids)]
+
             with _reindex_lock:
                 retriever.retriever_instance.initialize()
-                retriever.retriever_instance.reindex(progress_callback=on_stage)
+                # Incremental first (embeds only the new files); a False
+                # return means the fast path can't apply — full rebuild.
+                if not retriever.retriever_instance.add_files_incremental(
+                        filenames, progress_callback=on_stage):
+                    retriever.retriever_instance.reindex(progress_callback=on_stage)
             self._finalise_completed(ids)
             logger.info("[Library] Batch %s completed", ids)
         except Exception as exc:
@@ -216,7 +223,8 @@ class LibraryService:
 
         with _reindex_lock:
             retriever.retriever_instance.initialize()
-            retriever.retriever_instance.reindex()
+            if not retriever.retriever_instance.remove_file_incremental(filename):
+                retriever.retriever_instance.reindex()
 
         # Chunk counts shift after a rebuild — refresh all remaining rows.
         counts = _chunk_counts_by_source()

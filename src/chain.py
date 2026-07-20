@@ -216,6 +216,17 @@ class RAGChain:
         """Returns the configured LLM instance (never returns a mock object)."""
         provider = config.LLM_PROVIDER
 
+        if provider == "claude" and config.ANTHROPIC_API_KEY:
+            print(f"[RAGChain] Using Claude ({config.ANTHROPIC_MODEL}) for generation.")
+            # Imported lazily so the dependency is only needed when selected.
+            # No temperature: sampling params are rejected on Opus 4.7+ models.
+            from langchain_anthropic import ChatAnthropic
+            return ChatAnthropic(
+                model=config.ANTHROPIC_MODEL,
+                api_key=config.ANTHROPIC_API_KEY,
+                max_tokens=1024,
+            )
+
         if provider == "gemini" and config.GEMINI_API_KEY:
             print("[RAGChain] Using Gemini API for generation.")
             return ChatGoogleGenerativeAI(
@@ -235,8 +246,8 @@ class RAGChain:
         if provider == "local":
             return self._get_local_llm()
 
-        # Gemini/OpenAI requested but key missing — fall back to local
-        if provider in ("gemini", "openai"):
+        # Cloud provider requested but key missing — fall back to local
+        if provider in ("claude", "gemini", "openai"):
             print(
                 f"[RAGChain] WARNING: LLM_PROVIDER={provider} but no API key found. "
                 "Falling back to local model."
@@ -492,6 +503,8 @@ class RAGChain:
         return max(1, len(text) // 4), True
 
     def _llm_model_name(self, provider: str) -> str:
+        if provider == "claude":
+            return config.ANTHROPIC_MODEL
         if provider == "gemini":
             return "gemini-1.5-flash"
         if provider == "openai":

@@ -1,4 +1,8 @@
-# API Reference
+# API Reference (summary)
+
+> The full v1.0 reference — request/response examples, auth, and error
+> codes for every endpoint — is in **[API_REFERENCE.md](API_REFERENCE.md)**.
+> This file is the condensed overview.
 
 Base URL: `http://HOST:PORT` (default `http://127.0.0.1:8000`).
 Interactive documentation: `/docs` (Swagger UI), `/redoc`.

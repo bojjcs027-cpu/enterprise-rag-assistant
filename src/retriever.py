@@ -151,6 +151,124 @@ class HybridRetriever:
 
         print("Indexing completed and files saved to disk.")
 
+    # ------------------------------------------------------------------
+    # Incremental indexing
+    # ------------------------------------------------------------------
+    #
+    # FAISS supports adding vectors and removing them by docstore id, so an
+    # upload only embeds the new file's chunks and a delete only drops that
+    # file's vectors. BM25 has no incremental API, but rebuilding it from the
+    # in-memory chunk list is pure-Python tokenisation — milliseconds at this
+    # corpus scale — so it is rebuilt on every change. Any inconsistency or
+    # unsupported state falls back to a full reindex(), which remains the
+    # source of truth.
+
+    _PLACEHOLDER_SOURCE = "placeholder.md"
+
+    def _persist_indexes(self):
+        """Saves the FAISS store + BM25 pickle and invalidates caches."""
+        vector_db_path = Path(config.VECTOR_DB_DIR)
+        vector_db_path.mkdir(parents=True, exist_ok=True)
+        self.vector_store.save_local(str(vector_db_path))
+
+        self.bm25_retriever = BM25Retriever.from_documents(self.all_documents)
+        self.bm25_retriever.k = config.TOP_K_RETRIEVAL
+        with open(vector_db_path / "bm25.pkl", "wb") as f:
+            pickle.dump({
+                "retriever": self.bm25_retriever,
+                "documents": self.all_documents
+            }, f)
+
+        self.index_version += 1
+        self._retrieval_cache.clear()
+
+    def _docstore_ids_for_source(self, filename: str) -> list:
+        """Docstore ids of every vector whose chunk came from filename."""
+        ids = []
+        for ds_id in self.vector_store.index_to_docstore_id.values():
+            doc = self.vector_store.docstore.search(ds_id)
+            if isinstance(doc, Document) and doc.metadata.get("source") == filename:
+                ids.append(ds_id)
+        return ids
+
+    def add_files_incremental(self, filenames: list, progress_callback=None) -> bool:
+        """Indexes just the given files into the existing indexes.
+
+        Returns True on success; False means the caller should run a full
+        reindex() (no vector store yet, placeholder index, or any error).
+        """
+        def notify(stage: str):
+            if progress_callback:
+                try:
+                    progress_callback(stage)
+                except Exception:
+                    pass
+
+        if self.vector_store is None or any(
+            d.metadata.get("source") == self._PLACEHOLDER_SOURCE
+            for d in self.all_documents
+        ):
+            return False
+
+        try:
+            notify("chunking")
+            new_docs = document_loader.load_and_chunk_documents(
+                only_files=set(filenames))
+            if not new_docs:
+                return False
+
+            # Re-upload safety: drop any existing chunks for these files first.
+            for name in set(filenames):
+                stale = self._docstore_ids_for_source(name)
+                if stale:
+                    self.vector_store.delete(stale)
+            names = set(filenames)
+            self.all_documents = [
+                d for d in self.all_documents
+                if d.metadata.get("source") not in names
+            ]
+
+            notify("embedding")
+            print(f"Incrementally embedding {len(new_docs)} chunks from {sorted(names)}...")
+            self.vector_store.add_documents(new_docs)
+            self.all_documents.extend(new_docs)
+
+            notify("indexing")
+            self._persist_indexes()
+            print("Incremental indexing completed.")
+            return True
+        except Exception as e:
+            print(f"Incremental add failed ({e}) — falling back to full reindex.")
+            return False
+
+    def remove_file_incremental(self, filename: str) -> bool:
+        """Removes one file's chunks from the indexes without a rebuild.
+
+        Returns True on success; False means the caller should run a full
+        reindex() (e.g. removing the last document, or any error).
+        """
+        if self.vector_store is None:
+            return False
+
+        remaining = [
+            d for d in self.all_documents
+            if d.metadata.get("source") != filename
+        ]
+        if not remaining:
+            return False  # empty index needs the placeholder path in reindex()
+
+        try:
+            ids = self._docstore_ids_for_source(filename)
+            if ids:
+                self.vector_store.delete(ids)
+            self.all_documents = remaining
+            self._persist_indexes()
+            print(f"Incrementally removed {len(ids)} chunks of {filename}.")
+            return True
+        except Exception as e:
+            print(f"Incremental remove failed ({e}) — falling back to full reindex.")
+            return False
+
     def rrf_fusion(
         self, 
         vector_results: List[Document], 

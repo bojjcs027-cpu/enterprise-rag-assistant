@@ -24,9 +24,15 @@ def parse_section_name(metadata: dict) -> str:
     return "General"
 
 
-def load_and_chunk_documents(data_dir: Path = config.DATA_DIR) -> List[Document]:
+def load_and_chunk_documents(
+    data_dir: Path = config.DATA_DIR,
+    only_files: set[str] | None = None,
+) -> List[Document]:
     """
-    Loads all markdown and text documents from data_dir and chunks them.
+    Loads documents from data_dir and chunks them.
+
+    only_files, when given, restricts loading to those filenames — used by
+    incremental indexing to chunk just an upload batch.
 
     Annotates each chunk with:
       - source:   original filename
@@ -35,6 +41,9 @@ def load_and_chunk_documents(data_dir: Path = config.DATA_DIR) -> List[Document]
       - page:     estimated page number based on cumulative character position
     """
     docs_to_index = []
+
+    def wanted(path: Path) -> bool:
+        return only_files is None or path.name in only_files
 
     # 1. Markdown header splitter — preserves section hierarchy in metadata
     headers_to_split_on = [
@@ -52,7 +61,7 @@ def load_and_chunk_documents(data_dir: Path = config.DATA_DIR) -> List[Document]
     )
 
     # 3. Process markdown files
-    for file_path in sorted(data_dir.glob("*.md")):
+    for file_path in sorted(p for p in data_dir.glob("*.md") if wanted(p)):
         filename = file_path.name
         with open(file_path, "r", encoding="utf-8") as f:
             content = f.read()
@@ -89,7 +98,7 @@ def load_and_chunk_documents(data_dir: Path = config.DATA_DIR) -> List[Document]
                 chunk_idx += 1
 
     # 4. Process plain text files
-    for file_path in sorted(data_dir.glob("*.txt")):
+    for file_path in sorted(p for p in data_dir.glob("*.txt") if wanted(p)):
         filename = file_path.name
         with open(file_path, "r", encoding="utf-8") as f:
             content = f.read()
@@ -110,7 +119,7 @@ def load_and_chunk_documents(data_dir: Path = config.DATA_DIR) -> List[Document]
             )
 
     # 5. Process PDF files
-    for file_path in sorted(data_dir.glob("*.pdf")):
+    for file_path in sorted(p for p in data_dir.glob("*.pdf") if wanted(p)):
         filename = file_path.name
         loader = PyPDFLoader(str(file_path))
         pdf_docs = loader.load()
@@ -130,7 +139,7 @@ def load_and_chunk_documents(data_dir: Path = config.DATA_DIR) -> List[Document]
 
     # 6. Process DOCX files
     if Docx2txtLoader:
-        for file_path in sorted(data_dir.glob("*.docx")):
+        for file_path in sorted(p for p in data_dir.glob("*.docx") if wanted(p)):
             filename = file_path.name
             loader = Docx2txtLoader(str(file_path))
             docx_docs = loader.load()
