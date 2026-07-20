@@ -1,0 +1,20 @@
+services:
+  rag:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      HOST: 0.0.0.0
+      PORT: 8000
+      LLM_PROVIDER: ${LLM_PROVIDER:-local}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?set JWT_SECRET_KEY in your shell or .env}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://127.0.0.1:8000,http://localhost:8000}
+    volumes:
+      # Persist uploaded documents, indexes, auth DB, and chat history
+      - rag_data:/app/data
+    restart: unless-stopped
+
+volumes:
+  rag_data:

@@ -1,0 +1,33 @@
+[
+  {
+    "query": "What are the AWS IAM password and MFA policies?",
+    "ground_truth": "MFA is strictly required for all IAM users and root accounts. Any account without MFA active for 24 hours is automatically disabled by OmniGuard-IAM [omnicorp_cloud_security.md#IAM Policy Requirements]. AWS access keys must be rotated every 90 days, and static credentials for cross-account operations are prohibited [omnicorp_cloud_security.md#Cross-Account Access].",
+    "expected_citations": [
+      "omnicorp_cloud_security.md#IAM Policy Requirements",
+      "omnicorp_cloud_security.md#Cross-Account Access"
+    ]
+  },
+  {
+    "query": "What is the rotation policy for KMS Customer Managed Keys?",
+    "ground_truth": "Customer Managed Keys (CMKs) must have automatic annual rotation enabled [omnicorp_cloud_security.md#KMS Key Management].",
+    "expected_citations": ["omnicorp_cloud_security.md#KMS Key Management"]
+  },
+  {
+    "query": "Is split tunneling permitted on the corporate VPN?",
+    "ground_truth": "No, split tunneling is disabled on all corporate VPN profiles [omnicorp_remote_work.md#Secure Connection Requirements]. All internet traffic must route through the OmniCorp Security Gateway for inspection and threat analysis.",
+    "expected_citations": ["omnicorp_remote_work.md#Secure Connection Requirements"]
+  },
+  {
+    "query": "How is Restricted data defined and handled?",
+    "ground_truth": "Restricted data is highly sensitive data that would cause severe damage if compromised, such as customer PII, PCI details, or proprietary source code [omnicorp_data_classification.md#1. Restricted (Confidential-Restricted)]. It must be encrypted at rest using CMKs and in transit using TLS 1.3.",
+    "expected_citations": ["omnicorp_data_classification.md#1. Restricted (Confidential-Restricted)"]
+  },
+  {
+    "query": "How long are VPC Flow Logs retained?",
+    "ground_truth": "VPC Flow Logs must be retained for 1 year (365 days) [omnicorp_cloud_security.md#VPC Flow Logs] in the omnicorp-security-logs-archive S3 bucket [omnicorp_data_classification.md#Retention Schedule].",
+    "expected_citations": [
+      "omnicorp_cloud_security.md#VPC Flow Logs",
+      "omnicorp_data_classification.md#Retention Schedule"
+    ]
+  }
+]

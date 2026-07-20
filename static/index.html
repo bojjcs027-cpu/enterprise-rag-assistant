@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="OmniGuard Ask-My-Docs RAG Assistant — Enterprise AI-powered compliance document search with hybrid retrieval, reranking, and citation enforcement.">
+    <title>OmniCorp Ask-My-Docs RAG Assistant</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="/static/index.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <!-- Authentication Overlay (JWT login / signup) -->
+    <div id="sso-overlay" class="sso-overlay active">
+        <div class="sso-modal">
+            <div class="sso-logo">
+                <i class="fa-solid fa-shield-halved"></i>
+                <h2>OmniCorp Identity</h2>
+            </div>
+            <p class="sso-subtitle" id="auth-subtitle">Sign in to your account</p>
+
+            <div id="auth-error" class="auth-error" style="display:none;"></div>
+
+            <!-- LOGIN FORM -->
+            <form id="login-form" class="sso-form">
+                <div class="input-group">
+                    <label for="login-email">Email</label>
+                    <input type="email" id="login-email" placeholder="you@omnicorp.com" required autocomplete="email">
+                </div>
+                <div class="input-group">
+                    <label for="login-password">Password</label>
+                    <input type="password" id="login-password" placeholder="••••••••" required autocomplete="current-password">
+                </div>
+                <label class="remember-row">
+                    <input type="checkbox" id="login-remember">
+                    <span>Remember me on this device</span>
+                </label>
+                <button type="submit" class="action-btn sso-btn" id="login-submit-btn">
+                    <i class="fa-solid fa-right-to-bracket"></i> Sign In
+                </button>
+            </form>
+
+            <!-- SIGNUP FORM -->
+            <form id="signup-form" class="sso-form" style="display:none;">
+                <div class="input-group">
+                    <label for="signup-name">Full Name</label>
+                    <input type="text" id="signup-name" placeholder="Jane Smith" required minlength="2" maxlength="120" autocomplete="name">
+                </div>
+                <div class="input-group">
+                    <label for="signup-email">Email</label>
+                    <input type="email" id="signup-email" placeholder="you@omnicorp.com" required autocomplete="email">
+                </div>
+                <div class="input-group">
+                    <label for="signup-password">Password</label>
+                    <input type="password" id="signup-password" placeholder="Min 8 chars, letters &amp; digits" required minlength="8" autocomplete="new-password">
+                </div>
+                <div class="input-group">
+                    <label for="signup-confirm">Confirm Password</label>
+                    <input type="password" id="signup-confirm" placeholder="Repeat password" required autocomplete="new-password">
+                </div>
+                <button type="submit" class="action-btn sso-btn" id="signup-submit-btn">
+                    <i class="fa-solid fa-user-plus"></i> Create Account
+                </button>
+            </form>
+
+            <div class="auth-switch-row">
+                <span id="auth-switch-label">Don't have an account?</span>
+                <button type="button" class="auth-switch-btn" id="auth-switch-btn">Sign up</button>
+            </div>
+
+            <div class="sso-footer">
+                <p>Secured by OmniGuard Identity Management</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="app-container" id="main-app" style="display: none;">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="logo-area">
+                <div class="logo-icon"><i class="fa-solid fa-shield-halved"></i></div>
+                <div class="logo-text">
+                    <h1>OmniGuard</h1>
+                    <span>Ask-My-Docs RAG</span>
+                </div>
+            </div>
+            
+            <nav class="nav-menu">
+                <button class="nav-btn active" data-tab="chat-tab">
+                    <i class="fa-solid fa-comments"></i> <span>Ask Assistant</span>
+                </button>
+                <button class="nav-btn" data-tab="debug-tab">
+                    <i class="fa-solid fa-magnifying-glass-chart"></i> <span>Retrieval Debugger</span>
+                </button>
+                <button class="nav-btn" data-tab="eval-tab">
+                    <i class="fa-solid fa-chart-line"></i> <span>Evaluation Panel</span>
+                </button>
+                <button class="nav-btn" data-tab="docs-tab">
+                    <i class="fa-solid fa-folder-open"></i> <span>Knowledge Library</span>
+                </button>
+            </nav>
+
+            <div class="sidebar-footer">
+                <!-- User profile dropdown (populated by JS after login) -->
+                <div class="user-menu" id="user-menu" style="display:none;">
+                    <button class="user-menu-trigger" id="user-menu-trigger" aria-expanded="false" aria-haspopup="menu">
+                        <div class="user-badge-avatar" id="user-avatar-initials">?</div>
+                        <div class="user-badge-info">
+                            <span class="user-badge-name" id="user-menu-name">—</span>
+                            <span class="user-badge-role" id="user-menu-role">—</span>
+                        </div>
+                        <i class="fa-solid fa-chevron-up user-menu-caret"></i>
+                    </button>
+                    <div class="user-menu-dropdown" id="user-menu-dropdown" role="menu" style="display:none;">
+                        <button class="user-menu-item" id="menu-profile-btn" role="menuitem">
+                            <i class="fa-solid fa-id-card"></i> My Profile
+                        </button>
+                        <button class="user-menu-item danger" id="menu-logout-btn" role="menuitem">
+                            <i class="fa-solid fa-right-from-bracket"></i> Sign Out
+                        </button>
+                    </div>
+                </div>
+                <div class="provider-info">
+                    <span class="label">LLM ENGINE</span>
+                    <div class="provider-pill" id="active-provider-pill">
+                        <i class="fa-solid fa-circle"></i> <span id="active-provider-name">Initializing...</span>
+                    </div>
+                </div>
+                <!-- System stats — populated by JS from /api/status -->
+                <div class="system-stats" id="system-stats-panel"></div>
+            </div>
+        </aside>
+
+        <!-- Main Workspace -->
+        <main class="main-content">
+            
+            <!-- CHAT WORKSPACE TAB -->
+            <section id="chat-tab" class="tab-pane active">
+                <header class="tab-header">
+                    <div class="header-titles">
+                        <h2>Compliance AI Assistant</h2>
+                        <p>Search corporate policy documentation with strict citation enforcement.</p>
+                    </div>
+                    <button class="action-btn-secondary" id="clear-chat-btn"><i class="fa-solid fa-trash-can"></i> Clear History</button>
+                </header>
+
+                <div class="chat-wrapper">
+                    <div class="chat-history" id="chat-history-container">
+                        <!-- Welcome message -->
+                        <div class="message system-msg">
+                            <div class="msg-avatar"><i class="fa-solid fa-robot"></i></div>
+                            <div class="msg-bubble">
+                                <p>Welcome to OmniGuard Ask-My-Docs! I am configured with hybrid search retrieval (BM25 + FAISS Vector) and Cross-Encoder reranking.</p>
+                                <p>Ask me any question regarding AWS IAM, KMS encryption, VPC configs, remote work VPNs, or data classification.</p>
+                                <div class="quick-prompts">
+                                    <span class="prompt-chip" data-query="What are the AWS IAM password and MFA policies?">AWS IAM &amp; MFA Policy</span>
+                                    <span class="prompt-chip" data-query="What is the rotation policy for KMS Customer Managed Keys?">KMS Rotation Rules</span>
+                                    <span class="prompt-chip" data-query="Is split tunneling permitted on the corporate VPN?">VPN Split Tunneling</span>
+                                    <span class="prompt-chip" data-query="How long are VPC Flow Logs retained?">VPC Flow Log Retention</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="chat-input-area">
+                        <form id="chat-form" class="chat-form">
+                            <input type="text" id="query-input" placeholder="Ask a policy question… (Ctrl+Enter to send)" required autocomplete="off" maxlength="500">
+                            <button type="submit" class="submit-btn" id="submit-btn"><i class="fa-solid fa-paper-plane"></i></button>
+                        </form>
+                        <div class="input-footer">
+                            <span id="char-counter" class="char-counter">0 / 500</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- RETRIEVAL DEBUGGER TAB -->
+            <section id="debug-tab" class="tab-pane">
+                <header class="tab-header">
+                    <div class="header-titles">
+                        <h2>Retrieval Step Inspector</h2>
+                        <p>Analyze how the RAG pipeline processes your query. Compare BM25, Vector, RRF, and Reranking scores.</p>
+                    </div>
+                </header>
+
+                <div class="debug-container">
+                    <div class="debug-search-bar">
+                        <form id="debug-search-form" class="debug-search-form">
+                            <input type="text" id="debug-query-input" placeholder="Enter query to inspect search pipeline stages..." required>
+                            <button type="submit" class="action-btn"><i class="fa-solid fa-magnifying-glass"></i> Inspect Stages</button>
+                        </form>
+                    </div>
+
+                    <div class="debug-visualizer-grid" id="debug-visualizer-container">
+                        <!-- Placeholder -->
+                        <div class="debug-empty-state">
+                            <i class="fa-solid fa-diagram-project"></i>
+                            <h3>No Diagnostic Run</h3>
+                            <p>Submit a query above to visualize retrieval ranks and scores side-by-side.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- EVALUATION PANEL TAB -->
+            <section id="eval-tab" class="tab-pane">
+                <header class="tab-header">
+                    <div class="header-titles">
+                        <h2>CI/CD Evaluation Analytics</h2>
+                        <p>Monitor retrieval effectiveness, citation completeness, and semantic answer accuracy against test baselines.</p>
+                    </div>
+                    <div class="eval-header-actions">
+                        <button class="action-btn-secondary" id="compare-runs-btn" style="display:none;"><i class="fa-solid fa-code-compare"></i> Compare Runs</button>
+                        <button class="action-btn" id="run-eval-btn"><i class="fa-solid fa-play"></i> Trigger Evaluation</button>
+                    </div>
+                </header>
+
+                <div class="eval-container">
+                    <!-- Metric Cards — 6 cards rendered by JS -->
+                    <div class="metrics-grid" id="metrics-cards-container">
+                        <div class="metric-card">
+                            <div class="card-icon-wrap" style="background:rgba(16,185,129,0.12);"><i class="fa-solid fa-bullseye" style="color:#10B981;"></i></div>
+                            <span class="card-label">Retrieval Recall</span>
+                            <h3 class="card-value">-</h3>
+                            <p class="card-desc">Proportion of ground-truth docs retrieved</p>
+                        </div>
+                        <div class="metric-card">
+                            <div class="card-icon-wrap" style="background:rgba(139,92,246,0.12);"><i class="fa-solid fa-quote-left" style="color:#8B5CF6;"></i></div>
+                            <span class="card-label">Citation Precision</span>
+                            <h3 class="card-value">-</h3>
+                            <p class="card-desc">Validity of citations in answer</p>
+                        </div>
+                        <div class="metric-card">
+                            <div class="card-icon-wrap" style="background:rgba(59,130,246,0.12);"><i class="fa-solid fa-brain" style="color:#3B82F6;"></i></div>
+                            <span class="card-label">Faithfulness</span>
+                            <h3 class="card-value">-</h3>
+                            <p class="card-desc">Answer alignment to context</p>
+                        </div>
+                        <div class="metric-card">
+                            <div class="card-icon-wrap" style="background:rgba(239,68,68,0.12);"><i class="fa-solid fa-ghost" style="color:#EF4444;"></i></div>
+                            <span class="card-label">Hallucination</span>
+                            <h3 class="card-value">-</h3>
+                            <p class="card-desc">Inverse of faithfulness score</p>
+                        </div>
+                        <div class="metric-card">
+                            <div class="card-icon-wrap" style="background:rgba(245,158,11,0.12);"><i class="fa-solid fa-trophy" style="color:#F59E0B;"></i></div>
+                            <span class="card-label">Answer Relevance</span>
+                            <h3 class="card-value">-</h3>
+                            <p class="card-desc">Semantic similarity to query</p>
+                        </div>
+                        <div class="metric-card">
+                            <div class="card-icon-wrap" style="background:rgba(239,68,68,0.12);"><i class="fa-solid fa-stopwatch" style="color:#EF4444;"></i></div>
+                            <span class="card-label">Mean Latency</span>
+                            <h3 class="card-value">-</h3>
+                            <p class="card-desc">Average QA processing speed</p>
+                        </div>
+                    </div>
+
+                    <!-- Charts — line chart + radar chart side by side -->
+                    <div class="eval-charts-row">
+                        <div class="chart-panel chart-panel--line">
+                            <div class="panel-header">
+                                <h3>Performance Over Time (Evaluation Runs)</h3>
+                            </div>
+                            <div class="chart-wrapper-canvas">
+                                <canvas id="metricsChart"></canvas>
+                            </div>
+                        </div>
+                        <div class="chart-panel chart-panel--radar">
+                            <div class="panel-header">
+                                <h3>Latest Run Snapshot</h3>
+                            </div>
+                            <div class="chart-wrapper-canvas chart-wrapper-canvas--radar">
+                                <canvas id="radarChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="eval-history-panel">
+                        <div class="panel-header">
+                            <h3>Evaluation Run History</h3>
+                        </div>
+                        <div class="table-container">
+                            <table class="history-table">
+                                <thead>
+                                    <tr>
+                                        <th>Timestamp</th>
+                                        <th>Provider</th>
+                                        <th>Recall@K</th>
+                                        <th>MRR</th>
+                                        <th>Citation Acc</th>
+                                        <th>Faithfulness</th>
+                                        <th>Answer Rel</th>
+                                        <th>Avg Latency</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="eval-history-tbody">
+                                    <tr>
+                                        <td colspan="7" class="text-center">No runs recorded. Click "Trigger Evaluation" to execute first benchmark.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- KNOWLEDGE LIBRARY TAB -->
+            <section id="docs-tab" class="tab-pane">
+                <header class="tab-header">
+                    <div class="header-titles">
+                        <h2>Knowledge Library</h2>
+                        <p>Upload documentation policies and view file chunk allocations in the search database.</p>
+                    </div>
+                </header>
+
+                <div class="docs-container">
+                    <div class="upload-section">
+                        <div class="upload-card" id="drop-zone">
+                            <i class="fa-solid fa-cloud-arrow-up" id="upload-icon"></i>
+                            <h3>Upload New Policy Document</h3>
+                            <p>Drag and drop files (<code>.md</code>, <code>.txt</code>, <code>.pdf</code>, <code>.docx</code>), or click to browse &middot; max 25&nbsp;MB each</p>
+                            <input type="file" id="file-uploader" accept=".md,.txt,.pdf,.docx" multiple style="display: none;">
+                            <div id="upload-status" class="upload-status"></div>
+                        </div>
+
+                        <!-- Per-batch processing pipeline (populated by JS) -->
+                        <div class="upload-pipeline-panel" id="upload-pipeline-panel" style="display:none;">
+                            <div class="upload-pipeline-files" id="upload-pipeline-files"></div>
+                            <div class="upload-stepper" id="upload-stepper"></div>
+                            <div class="upload-progress-track" id="upload-progress-track">
+                                <div class="upload-progress-fill" id="upload-progress-fill"></div>
+                            </div>
+                            <div class="upload-progress-label" id="upload-progress-label"></div>
+                        </div>
+                    </div>
+
+                    <div class="library-section">
+                        <div class="panel-header library-header">
+                            <h3>Indexed Policy Files</h3>
+                            <div class="library-stats">
+                                <span class="library-stat-chip" title="Documents in library">
+                                    <i class="fa-solid fa-file-lines"></i> <strong id="doc-counter">0</strong> docs
+                                </span>
+                                <span class="library-stat-chip" title="Total indexed chunks">
+                                    <i class="fa-solid fa-cubes"></i> <strong id="chunk-counter">0</strong> chunks
+                                </span>
+                            </div>
+                            <div class="library-search-wrap">
+                                <i class="fa-solid fa-magnifying-glass"></i>
+                                <input type="search" id="library-search" placeholder="Search documents…" maxlength="100" autocomplete="off">
+                            </div>
+                        </div>
+                        <div class="docs-grid" id="documents-grid-container">
+                            <!-- Document cards will render here -->
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- Modals (Document Viewer for Citations) -->
+    <div class="modal" id="doc-viewer-modal">
+        <div class="modal-content">
+            <header class="modal-header">
+                <h3 id="modal-doc-title">Document Reference</h3>
+                <button class="close-modal-btn" id="close-modal-btn"><i class="fa-solid fa-xmark"></i></button>
+            </header>
+            <div class="modal-body">
+                <div class="doc-reference-card">
+                    <div class="card-meta">
+                        <span class="tag source-tag" id="modal-doc-source">file.md</span>
+                        <span class="tag section-tag" id="modal-doc-section">Section</span>
+                        <button class="action-btn-secondary open-source-btn" id="modal-open-source-btn" style="margin-left:auto;">
+                            <i class="fa-solid fa-arrow-up-right-from-square"></i> Open Source
+                        </button>
+                    </div>
+                    <!-- Retrieval explainability: scores, method, doc metadata -->
+                    <div class="citation-meta-grid" id="modal-doc-extra"></div>
+                    <div class="doc-content-block" id="modal-doc-content">
+                        Loading document chunk content...
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Profile Modal -->
+    <div class="modal" id="profile-modal">
+        <div class="modal-content profile-modal-content">
+            <header class="modal-header">
+                <h3><i class="fa-solid fa-id-card"></i> My Profile</h3>
+                <button class="close-modal-btn" id="close-profile-modal-btn"><i class="fa-solid fa-xmark"></i></button>
+            </header>
+            <div class="modal-body">
+                <div class="profile-summary">
+                    <div class="user-badge-avatar profile-avatar" id="profile-avatar-initials">?</div>
+                    <div>
+                        <h4 id="profile-name">—</h4>
+                        <p id="profile-email" class="profile-email">—</p>
+                        <span class="tag" id="profile-role-tag">—</span>
+                        <span class="tag" id="profile-joined-tag">—</span>
+                    </div>
+                </div>
+
+                <div id="profile-feedback" class="auth-error" style="display:none;"></div>
+
+                <form id="profile-name-form" class="profile-form">
+                    <h5 class="profile-section-title">Display Name</h5>
+                    <div class="input-group">
+                        <input type="text" id="profile-name-input" minlength="2" maxlength="120" required>
+                    </div>
+                    <button type="submit" class="action-btn-secondary">Save Name</button>
+                </form>
+
+                <form id="profile-password-form" class="profile-form">
+                    <h5 class="profile-section-title">Change Password</h5>
+                    <div class="input-group">
+                        <label for="profile-current-password">Current password</label>
+                        <input type="password" id="profile-current-password" required autocomplete="current-password">
+                    </div>
+                    <div class="input-group">
+                        <label for="profile-new-password">New password</label>
+                        <input type="password" id="profile-new-password" required minlength="8" autocomplete="new-password">
+                    </div>
+                    <button type="submit" class="action-btn-secondary">Change Password</button>
+                    <p class="profile-hint">Changing your password signs you out of all other sessions.</p>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom JS -->
+    <script src="/static/auth.js" defer></script>
+    <script src="/static/app.js" defer></script>
+</body>
+</html>

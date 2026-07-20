@@ -1,0 +1,16 @@
+.env
+.git
+__pycache__
+*.pyc
+.pytest_cache
+.venv
+venv
+data/vectorstore
+data/auth.db
+data/chat_history.db
+data/semantic_cache.pkl
+data/eval_history.json
+.claude
+.github
+tests
+desktop.ini
