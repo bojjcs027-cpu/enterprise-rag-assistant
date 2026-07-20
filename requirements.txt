@@ -29,6 +29,14 @@ python-multipart>=0.0.6
 transformers>=4.35.0
 accelerate>=0.24.0
 
+# Observability & scaling
+prometheus-client>=0.20
+redis>=5.0
+fakeredis>=2.20        # test-only: in-process Redis for unit tests
+
+# Optional cloud LLM providers
+langchain-anthropic>=1.0
+
 # Authentication
 sqlalchemy>=2.0
 alembic>=1.13

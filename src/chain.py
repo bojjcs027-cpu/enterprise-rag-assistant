@@ -24,7 +24,7 @@ from langchain_core.language_models.llms import LLM
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_openai import ChatOpenAI
 
-from src import config, retriever, reranker
+from src import config, redis_backend, retriever, reranker
 
 import logging
 logger = logging.getLogger(__name__)
@@ -75,7 +75,21 @@ class SemanticCache:
         self.index_version = None
         self.load()
 
+    REDIS_KEY = "rag:semcache"
+
     def load(self):
+        """Loads persisted entries — from Redis when configured, else the
+        local pickle file. The in-memory list is always the working set;
+        persistence only matters across restarts."""
+        r = redis_backend.get_redis()
+        if r is not None:
+            try:
+                blobs = r.lrange(self.REDIS_KEY, 0, -1)
+                self.cache = [pickle.loads(b) for b in blobs]
+                print(f"[SemanticCache] Loaded {len(self.cache)} entries from Redis.")
+                return
+            except Exception as e:
+                print(f"[SemanticCache] Redis load failed ({e}) — trying file.")
         if self.cache_file.exists():
             try:
                 with open(self.cache_file, "rb") as f:
@@ -86,6 +100,17 @@ class SemanticCache:
                 self.cache = []
 
     def save(self):
+        r = redis_backend.get_redis()
+        if r is not None:
+            try:
+                pipe = r.pipeline()
+                pipe.delete(self.REDIS_KEY)
+                if self.cache:
+                    pipe.rpush(self.REDIS_KEY, *(pickle.dumps(e) for e in self.cache))
+                pipe.execute()
+                return
+            except Exception as e:
+                print(f"[SemanticCache] Redis save failed ({e}) — using file.")
         try:
             self.cache_file.parent.mkdir(parents=True, exist_ok=True)
             with open(self.cache_file, "wb") as f:

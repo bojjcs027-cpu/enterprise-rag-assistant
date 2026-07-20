@@ -67,6 +67,8 @@ async def upload_documents(
         raise HTTPException(status_code=exc.status_code, detail=exc.detail)
 
     if created_ids:
+        from src import metrics
+        metrics.UPLOADS.inc(len(created_ids))
         background.add_task(library_service.process_batch, created_ids)
 
     if not created_ids and skipped:

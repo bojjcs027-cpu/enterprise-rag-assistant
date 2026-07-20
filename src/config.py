@@ -56,6 +56,12 @@ CORS_ORIGINS = [
 #   DATABASE_URL=postgresql+psycopg2://user:pass@host:5432/omnicorp
 DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{BASE_DIR / 'data' / 'auth.db'}")
 
+# Redis (optional). Empty = disabled; all caches/limits stay in-memory.
+# e.g. REDIS_URL=redis://localhost:6379/0
+REDIS_URL = os.getenv("REDIS_URL", "")
+# TTL for shared retrieval-cache entries (seconds).
+REDIS_RETRIEVAL_TTL_SECONDS = int(os.getenv("REDIS_RETRIEVAL_TTL_SECONDS", 3600))
+
 # Rate limiting for login/signup: N attempts per client IP per window.
 RATE_LIMIT_AUTH_ATTEMPTS = int(os.getenv("RATE_LIMIT_AUTH_ATTEMPTS", 10))
 RATE_LIMIT_AUTH_WINDOW_SECONDS = int(os.getenv("RATE_LIMIT_AUTH_WINDOW_SECONDS", 60))

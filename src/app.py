@@ -12,7 +12,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
 
-from src import config, chain, retriever, evaluator, database
+from src import config, chain, retriever, evaluator, database, metrics
 from src.db import engine, Base
 from src.auth.router import router as auth_router
 from src.auth.dependencies import CurrentUser, AdminUser
@@ -65,6 +65,31 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Prometheus: request count / error count / latency per route template.
+# Uses the matched route path (not the raw URL) to keep label cardinality low.
+@app.middleware("http")
+async def prometheus_middleware(request, call_next):
+    import time as _time
+    start = _time.perf_counter()
+    try:
+        response = await call_next(request)
+        status_code = response.status_code
+    except Exception:
+        status_code = 500
+        raise
+    finally:
+        route = request.scope.get("route")
+        path = getattr(route, "path", None) or "unmatched"
+        method = request.method
+        metrics.HTTP_REQUESTS.labels(method=method, path=path,
+                                     status=str(status_code)).inc()
+        metrics.HTTP_LATENCY.labels(method=method, path=path).observe(
+            _time.perf_counter() - start)
+        if status_code >= 500:
+            metrics.HTTP_ERRORS.labels(method=method, path=path).inc()
+    return response
+
 
 # Authentication endpoints (/api/auth/*)
 app.include_router(auth_router)
@@ -132,6 +157,15 @@ async def health_check():
     return body
 
 
+@app.get("/metrics")
+async def prometheus_metrics():
+    """Prometheus scrape endpoint. Unauthenticated by design — restrict at
+    the network layer (it is not exposed through the dashboard)."""
+    from fastapi.responses import Response
+    payload, content_type = metrics.render()
+    return Response(content=payload, media_type=content_type)
+
+
 @app.get("/api/status")
 async def get_status(user: CurrentUser):
     """
@@ -189,6 +223,7 @@ async def chat_endpoint(request: ChatRequest, user: CurrentUser):
 
     # Server-authoritative session id — the client-supplied one is ignored.
     session_id = f"user:{user.id}"
+    metrics.record_chat_activity(user.id, session_id)
 
     if request.stream:
         try:
@@ -209,7 +244,13 @@ async def chat_endpoint(request: ChatRequest, user: CurrentUser):
                     if item.get("type") == "chunk":
                         full_answer += item.get("content", "")
                     elif item.get("type") == "done":
-                        database.save_message(session_id, "assistant", item.get("data", {}).get("answer", full_answer))
+                        data = item.get("data", {})
+                        database.save_message(session_id, "assistant", data.get("answer", full_answer))
+                        m = data.get("metrics") or {}
+                        metrics.observe_pipeline(
+                            m.get("timings_ms", {}), m.get("cache_hit", False),
+                            m.get("retrieval_cache_hit", False),
+                            (data.get("debug") or {}).get("llm_provider", "unknown"))
                     yield {"data": json.dumps(item)}
             except Exception as e:
                 logger.exception("Stream failed")
@@ -226,6 +267,10 @@ async def chat_endpoint(request: ChatRequest, user: CurrentUser):
                 request.history
             )
             database.save_message(session_id, "assistant", result["answer"])
+            m = result.get("metrics") or {}
+            metrics.observe_pipeline(
+                m.get("timings_ms", {}), m.get("cache_hit", False),
+                m.get("retrieval_cache_hit", False), result.get("provider", "unknown"))
             return ChatResponse(**result)
         except Exception as exc:
             logger.exception("RAG Chain execution failed")

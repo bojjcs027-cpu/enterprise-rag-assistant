@@ -1,0 +1,122 @@
+{
+  "uid": "rag-overview",
+  "title": "RAG Assistant — Overview",
+  "tags": ["rag", "production"],
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": {"from": "now-1h", "to": "now"},
+  "panels": [
+    {
+      "id": 1, "type": "timeseries", "title": "API Requests / s",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "datasource": {"type": "prometheus", "uid": "rag-prometheus"},
+      "targets": [{
+        "expr": "sum by (path) (rate(rag_http_requests_total[5m]))",
+        "legendFormat": "{{path}}", "refId": "A"
+      }]
+    },
+    {
+      "id": 2, "type": "timeseries", "title": "Response Time p95 (s)",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+      "datasource": {"type": "prometheus", "uid": "rag-prometheus"},
+      "targets": [{
+        "expr": "histogram_quantile(0.95, sum by (le, path) (rate(rag_http_request_seconds_bucket[5m])))",
+        "legendFormat": "{{path}}", "refId": "A"
+      }]
+    },
+    {
+      "id": 3, "type": "timeseries", "title": "Cache Hit Ratio",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+      "datasource": {"type": "prometheus", "uid": "rag-prometheus"},
+      "fieldConfig": {"defaults": {"unit": "percentunit", "max": 1, "min": 0}, "overrides": []},
+      "targets": [
+        {
+          "expr": "sum(rate(rag_semantic_cache_events_total{result=\"hit\"}[10m])) / clamp_min(sum(rate(rag_semantic_cache_events_total[10m])), 0.0001)",
+          "legendFormat": "semantic cache", "refId": "A"
+        },
+        {
+          "expr": "sum(rate(rag_retrieval_cache_events_total{result=\"hit\"}[10m])) / clamp_min(sum(rate(rag_retrieval_cache_events_total[10m])), 0.0001)",
+          "legendFormat": "retrieval cache", "refId": "B"
+        }
+      ]
+    },
+    {
+      "id": 4, "type": "timeseries", "title": "Upload Activity (docs/h)",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+      "datasource": {"type": "prometheus", "uid": "rag-prometheus"},
+      "targets": [{
+        "expr": "sum(increase(rag_uploads_total[1h]))",
+        "legendFormat": "uploads", "refId": "A"
+      }]
+    },
+    {
+      "id": 5, "type": "timeseries", "title": "Process CPU",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+      "datasource": {"type": "prometheus", "uid": "rag-prometheus"},
+      "fieldConfig": {"defaults": {"unit": "percentunit"}, "overrides": []},
+      "targets": [{
+        "expr": "rate(process_cpu_seconds_total{job=\"rag-assistant\"}[5m])",
+        "legendFormat": "cpu", "refId": "A"
+      }]
+    },
+    {
+      "id": 6, "type": "timeseries", "title": "Process Memory (RSS)",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+      "datasource": {"type": "prometheus", "uid": "rag-prometheus"},
+      "fieldConfig": {"defaults": {"unit": "bytes"}, "overrides": []},
+      "targets": [{
+        "expr": "process_resident_memory_bytes{job=\"rag-assistant\"}",
+        "legendFormat": "rss", "refId": "A"
+      }]
+    },
+    {
+      "id": 7, "type": "timeseries", "title": "Retrieval Time p95 (s)",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 24},
+      "datasource": {"type": "prometheus", "uid": "rag-prometheus"},
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(rag_retrieval_seconds_bucket[10m])))",
+          "legendFormat": "retrieval p95", "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(rag_rerank_seconds_bucket[10m])))",
+          "legendFormat": "rerank p95", "refId": "B"
+        }
+      ]
+    },
+    {
+      "id": 8, "type": "timeseries", "title": "LLM Time p95 (s)",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 24},
+      "datasource": {"type": "prometheus", "uid": "rag-prometheus"},
+      "targets": [{
+        "expr": "histogram_quantile(0.95, sum by (le) (rate(rag_llm_seconds_bucket[10m])))",
+        "legendFormat": "llm p95", "refId": "A"
+      }]
+    },
+    {
+      "id": 9, "type": "stat", "title": "Active Users (5m)",
+      "gridPos": {"h": 4, "w": 6, "x": 0, "y": 32},
+      "datasource": {"type": "prometheus", "uid": "rag-prometheus"},
+      "targets": [{"expr": "rag_active_users", "refId": "A"}]
+    },
+    {
+      "id": 10, "type": "stat", "title": "Active Conversations (5m)",
+      "gridPos": {"h": 4, "w": 6, "x": 6, "y": 32},
+      "datasource": {"type": "prometheus", "uid": "rag-prometheus"},
+      "targets": [{"expr": "rag_active_conversations", "refId": "A"}]
+    },
+    {
+      "id": 11, "type": "stat", "title": "Errors (1h)",
+      "gridPos": {"h": 4, "w": 6, "x": 12, "y": 32},
+      "datasource": {"type": "prometheus", "uid": "rag-prometheus"},
+      "targets": [{"expr": "sum(increase(rag_http_errors_total[1h])) or vector(0)", "refId": "A"}]
+    },
+    {
+      "id": 12, "type": "stat", "title": "Chats (1h)",
+      "gridPos": {"h": 4, "w": 6, "x": 18, "y": 32},
+      "datasource": {"type": "prometheus", "uid": "rag-prometheus"},
+      "targets": [{"expr": "sum(increase(rag_chat_requests_total[1h])) or vector(0)", "refId": "A"}]
+    }
+  ]
+}

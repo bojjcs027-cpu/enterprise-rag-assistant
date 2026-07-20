@@ -1,3 +1,4 @@
+import hashlib
 import pickle
 import threading
 import time
@@ -7,7 +8,7 @@ from typing import List, Dict, Any, Optional, Tuple
 from langchain_core.documents import Document
 from langchain_community.vectorstores import FAISS
 from langchain_community.retrievers import BM25Retriever
-from src import config, document_loader, reranker
+from src import config, document_loader, redis_backend, reranker
 
 # Use the up-to-date langchain_huggingface package; fall back to community if not installed
 try:
@@ -247,6 +248,24 @@ class HybridRetriever:
             self._retrieval_cache.move_to_end(cache_key)
             return {**cached, "from_cache": True}
 
+        # L2: shared Redis cache (best-effort; entries are TTL-bounded and
+        # keyed on the index generation so reindexes change the key).
+        redis_key = None
+        r = redis_backend.get_redis()
+        if r is not None:
+            digest = hashlib.sha256(
+                f"{query}|{top_k}|{self.index_version}".encode("utf-8")
+            ).hexdigest()
+            redis_key = f"rag:retrieval:{digest}"
+            try:
+                blob = r.get(redis_key)
+                if blob is not None:
+                    result = pickle.loads(blob)
+                    self._retrieval_cache[cache_key] = result  # promote to L1
+                    return {**result, "from_cache": True}
+            except Exception:
+                redis_key = None  # skip the write path this request too
+
         t0 = time.perf_counter()
 
         # --- Sparse (BM25) with real scores ---
@@ -303,6 +322,14 @@ class HybridRetriever:
         self._retrieval_cache[cache_key] = result
         if len(self._retrieval_cache) > RETRIEVAL_CACHE_SIZE:
             self._retrieval_cache.popitem(last=False)
+
+        if redis_key is not None:
+            try:
+                r.setex(redis_key, config.REDIS_RETRIEVAL_TTL_SECONDS,
+                        pickle.dumps(result))
+            except Exception:
+                pass  # shared cache is best-effort
+
         return result
 
 # Module-level singletons
