@@ -17,6 +17,21 @@ evaluation suite gated in CI.
 - **Observability** — unauthenticated `/api/health` probe, `/api/debug-retrieve` per-stage diagnostics
 - **Evaluation** — recall/MRR/citation precision-recall/semantic similarity/faithfulness over `data/eval_dataset.json`, CI gate (`src/run_ci.py`)
 
+## Screenshots
+
+> _Placeholders — drop images into `repo-assets/` and update the paths._
+
+| Chat with citations | Retrieval debugger | Evaluation dashboard |
+|---|---|---|
+| ![Chat](repo-assets/screenshot-chat.png) | ![Debugger](repo-assets/screenshot-debugger.png) | ![Evaluation](repo-assets/screenshot-eval.png) |
+
+## Documentation
+
+- [ARCHITECTURE.md](ARCHITECTURE.md) — system design and pipeline internals
+- [API.md](API.md) — full endpoint reference with payload shapes
+- [DEPLOYMENT.md](DEPLOYMENT.md) — Docker, PostgreSQL, env vars, operations, troubleshooting
+- [CONTRIBUTING.md](CONTRIBUTING.md) — dev setup, tests, conventions
+
 ## Quick start
 
 ```bash
@@ -98,9 +113,15 @@ alembic/           database migrations (`alembic upgrade head`)
 tests/             pytest suite
 ```
 
-## Windows note
+## Troubleshooting
 
-On some Windows machines torch's `c10.dll` intermittently fails to load
-when first imported inside pytest collection (`WinError 1114`).
-`tests/conftest.py` pre-imports torch to work around it. If the server
-itself hits this at startup, run it from an interactive terminal.
+| Symptom | Fix |
+|---|---|
+| `/api/health` returns 503 for minutes after start | first-boot model downloads — watch the logs, then it flips to 200 |
+| 500s mentioning JWT | set `JWT_SECRET_KEY` in `.env` |
+| CORS errors in the browser | add your frontend origin to `CORS_ORIGINS` |
+| `WinError 1114` loading `c10.dll` (Windows) | torch DLL flake — `run.py` and `tests/conftest.py` pre-import torch as a workaround; run from an interactive terminal if it persists |
+| `No module named 'numpy._core'` | numpy < 2 with faiss-cpu ≥ 1.14 — reinstall with `pip install -r requirements.txt` |
+| 429 on login | auth rate limiter — wait `Retry-After` seconds or tune `RATE_LIMIT_AUTH_*` |
+
+More in [DEPLOYMENT.md](DEPLOYMENT.md#7-troubleshooting).
