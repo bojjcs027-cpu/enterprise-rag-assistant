@@ -2171,3 +2171,343 @@ mark {
     gap: 8px;
     padding-bottom: 4px;
 }
+
+/* ==========================================================================
+   PHASE A — UI/UX POLISH LAYER (v1.1)
+   Refinements only: typography, spacing, motion, responsiveness, a11y.
+   Uses EXISTING theme variables exclusively — no new colors, no rebranding.
+   ========================================================================== */
+
+/* --- 1. Typography ------------------------------------------------------ */
+
+body {
+    font-size: 15px;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+}
+
+h1, h2, h3, h4, h5, h6 { letter-spacing: -0.015em; line-height: 1.25; }
+
+.header-titles h2 { font-size: clamp(1.25rem, 1.05rem + 0.8vw, 1.6rem); }
+.header-titles p  {
+    max-width: 62ch;               /* readable line length */
+    line-height: 1.55;
+    margin-top: 4px;
+}
+
+.message p { line-height: 1.65; }
+.msg-bubble { font-size: 0.95rem; }
+
+.panel-header h3,
+.column-header h3 {
+    font-size: 0.95rem;
+    letter-spacing: 0.01em;
+}
+
+/* Uniform label treatment (matches existing .provider-info .label styling) */
+.card-label,
+.metrics-panel-title,
+.citations-panel .section-title {
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+/* --- 2. Layout rhythm --------------------------------------------------- */
+
+.tab-header  { margin-bottom: 22px; gap: 16px; }
+.main-content { padding: 28px 32px; }
+
+.metrics-grid { gap: 16px; }
+.metric-card  { padding: 18px 20px; }
+
+.modal-body   { padding: 20px 24px 24px; }
+
+/* --- 3. Sidebar --------------------------------------------------------- */
+
+.nav-btn {
+    position: relative;
+    transition: background 0.25s ease, color 0.25s ease, transform 0.25s ease;
+}
+.nav-btn:hover  { transform: translateX(3px); }
+.nav-btn:active { transform: translateX(3px) scale(0.98); }
+
+/* Active indicator bar — uses the existing accent gradient */
+.nav-btn.active::before {
+    content: "";
+    position: absolute;
+    left: -12px; top: 20%;
+    height: 60%; width: 3px;
+    border-radius: 3px;
+    background: var(--accent-gradient);
+    animation: navIndicatorIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes navIndicatorIn { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+
+/* Consistent icon column so labels align */
+.nav-btn i {
+    width: 22px;
+    text-align: center;
+    flex-shrink: 0;
+    transition: transform 0.25s ease;
+}
+.nav-btn:hover i { transform: scale(1.12); }
+
+/* --- 4. Header widgets: profile dropdown, provider badge ---------------- */
+
+.user-menu-dropdown {
+    transform-origin: bottom center;
+    animation: dropdownIn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: var(--shadow-lg);
+}
+@keyframes dropdownIn {
+    from { opacity: 0; transform: translateY(6px) scale(0.97); }
+    to   { opacity: 1; transform: translateY(0)   scale(1); }
+}
+.user-menu-item { transition: background 0.18s ease, color 0.18s ease, padding-left 0.18s ease; }
+.user-menu-item:hover { padding-left: 18px; }
+
+.user-menu-trigger { transition: background 0.2s ease, border-color 0.2s ease; }
+.user-menu-caret   { transition: transform 0.25s ease; }
+
+.provider-pill {
+    transition: box-shadow 0.3s ease, border-color 0.3s ease;
+    white-space: nowrap;
+}
+.provider-pill:hover { box-shadow: var(--shadow-glow); }
+
+/* Status / notice banners (auth errors, upload status) */
+.auth-error, .auth-success { animation: float-up 0.25s ease; }
+.upload-status { transition: color 0.2s ease; }
+
+/* --- 5. Buttons: feedback, loading, disabled, ripple -------------------- */
+
+.action-btn, .action-btn-secondary, .submit-btn, .sso-btn,
+.pipeline-badge-toggle, .citation-item-btn, .prompt-chip,
+.msg-copy-btn, .close-modal-btn, .auth-switch-btn, .expand-text-btn {
+    transition: transform 0.15s ease, box-shadow 0.25s ease,
+                background 0.25s ease, color 0.25s ease, border-color 0.25s ease;
+}
+
+.action-btn:active, .action-btn-secondary:active,
+.submit-btn:active, .sso-btn:active, .prompt-chip:active { transform: scale(0.96); }
+
+button:disabled, .action-btn:disabled, .submit-btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+/* Loading state - add .btn-loading via JS; keeps size, shows spinner */
+.btn-loading { position: relative; color: transparent !important; pointer-events: none; }
+.btn-loading::after {
+    content: "";
+    position: absolute; inset: 0; margin: auto;
+    width: 16px; height: 16px;
+    border: 2px solid var(--text-primary);
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: btnSpin 0.7s linear infinite;
+}
+@keyframes btnSpin { to { transform: rotate(360deg); } }
+
+/* Lightweight ripple (span injected by JS) */
+.ripple-host { position: relative; overflow: hidden; }
+.ripple {
+    position: absolute;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.25);
+    transform: scale(0);
+    animation: rippleGo 0.55s ease-out forwards;
+    pointer-events: none;
+}
+@keyframes rippleGo { to { transform: scale(3); opacity: 0; } }
+
+/* --- 6. Cards ----------------------------------------------------------- */
+
+.metric-card, .debug-card, .chart-panel, .eval-history-panel,
+.upload-card, .doc-reference-card {
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+                box-shadow 0.3s ease, border-color 0.3s ease;
+}
+.metric-card:hover, .debug-card:hover { box-shadow: var(--shadow-md); }
+.chart-panel:hover, .eval-history-panel:hover { border-color: var(--border-glow); }
+
+.card-icon-wrap { transition: transform 0.3s ease; }
+.metric-card:hover .card-icon-wrap { transform: scale(1.1) rotate(-4deg); }
+
+/* --- 7. Forms ----------------------------------------------------------- */
+
+.input-group label { margin-bottom: 6px; letter-spacing: 0.02em; }
+
+.input-group input, .chat-form input, .debug-search-form input,
+.library-search-wrap input {
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+.input-group input:focus, .debug-search-form input:focus,
+.library-search-wrap input:focus {
+    box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.15); /* rgb of --border-glow */
+}
+
+/* Native validation feedback after user interaction (no new colors) */
+.input-group input:user-invalid {
+    border-color: var(--accent-danger);
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.12);
+}
+
+/* --- 8. Tables ---------------------------------------------------------- */
+
+.table-container { overflow-x: auto; overflow-y: auto; max-height: 420px; }
+
+.history-table th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--bg-secondary);
+    box-shadow: 0 1px 0 var(--border-color);
+}
+.history-table th, .history-table td { padding: 12px 16px; white-space: nowrap; }
+.history-table tbody tr { transition: background 0.15s ease; }
+
+/* --- 9. Scrollbars ------------------------------------------------------ */
+
+* { scrollbar-width: thin; scrollbar-color: var(--bg-tertiary) transparent; }
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+    background: var(--bg-tertiary);
+    border-radius: 6px;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* --- 10. Icons ---------------------------------------------------------- */
+
+.action-btn i, .action-btn-secondary i, .user-menu-item i,
+.library-stat-chip i, .sys-stat-row i {
+    width: 1.15em;
+    text-align: center;
+    flex-shrink: 0;
+}
+.action-btn i, .action-btn-secondary i { transition: transform 0.2s ease; }
+.action-btn:hover i, .action-btn-secondary:hover i { transform: translateX(1px); }
+
+/* --- 11. Transitions: tabs, modals, dropdowns --------------------------- */
+
+.tab-pane.active { animation: float-up 0.35s cubic-bezier(0.16, 1, 0.3, 1); }
+
+.modal { transition: opacity 0.22s ease, visibility 0.22s ease; }
+.modal .modal-content {
+    transform: translateY(14px) scale(0.98);
+    opacity: 0;
+    transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.22s ease;
+}
+.modal.active .modal-content { transform: translateY(0) scale(1); opacity: 1; }
+
+/* --- 12. Loading: skeletons + empty states ------------------------------ */
+
+.skeleton {
+    position: relative;
+    overflow: hidden;
+    background: var(--bg-tertiary);
+    border-radius: 8px;
+    min-height: 14px;
+}
+.skeleton::after {
+    content: "";
+    position: absolute; inset: 0;
+    background: linear-gradient(90deg, transparent,
+                rgba(255, 255, 255, 0.06), transparent);
+    animation: shimmer 1.4s infinite;
+}
+@keyframes shimmer { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+
+.skeleton-msg { display: flex; gap: 14px; margin-bottom: 20px; animation: float-up 0.3s ease; }
+.skeleton-msg .skeleton-avatar { width: 38px; height: 38px; border-radius: 12px; flex-shrink: 0; }
+.skeleton-msg .skeleton-lines  { flex: 1; max-width: 640px; }
+.skeleton-msg .skeleton-lines .skeleton { margin-bottom: 8px; }
+
+.debug-empty-state {
+    transition: border-color 0.3s ease;
+    border: 1px dashed var(--border-color);
+    border-radius: 16px;
+    padding: 48px 24px;
+}
+
+/* --- 13. Responsiveness ------------------------------------------------- */
+
+@media (max-width: 1100px) {
+    .main-content { padding: 22px 20px; }
+    .metrics-grid { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+    .debug-visualizer-grid { grid-template-columns: 1fr 1fr; }
+}
+
+@media (max-width: 900px) {
+    /* Sidebar collapses to an icon rail */
+    .sidebar { width: 74px; padding: 18px 10px; }
+    .logo-text, .nav-btn span, .user-badge-info, .user-menu-caret,
+    .provider-info, .system-stats { display: none; }
+    .nav-btn { justify-content: center; padding: 13px 0; }
+    .nav-btn.active::before { left: -8px; }
+    .user-menu-trigger { justify-content: center; padding: 8px; }
+    .logo-area { justify-content: center; }
+    .debug-visualizer-grid { grid-template-columns: 1fr; }
+    .docs-container { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 640px) {
+    /* Sidebar becomes a top bar; content stacks */
+    .app-container { flex-direction: column; }
+    .sidebar {
+        width: 100%;
+        height: auto;
+        flex-direction: row;
+        align-items: center;
+        padding: 10px 14px;
+        border-right: none;
+        border-bottom: 1px solid var(--border-color);
+    }
+    .nav-menu { flex-direction: row; flex: 1; justify-content: center; gap: 6px; margin: 0; }
+    .nav-btn { padding: 10px 12px; }
+    .nav-btn.active::before { left: 10%; top: auto; bottom: -10px; width: 80%; height: 3px; }
+    .sidebar-footer { margin: 0; display: flex; }
+    .main-content { padding: 16px 12px; height: calc(100vh - 60px); }
+    .tab-header { flex-direction: column; align-items: flex-start; gap: 10px; }
+    .message { max-width: 100%; }
+    .msg-bubble { max-width: calc(100vw - 110px); }
+    .chat-form { flex-wrap: nowrap; }
+    .modal-content { width: 94vw; max-height: 88vh; }
+    .eval-header-actions { width: 100%; justify-content: flex-start; }
+    .library-header { flex-wrap: wrap; }
+    .library-search-wrap { width: 100%; }
+}
+
+/* --- 14. Accessibility --------------------------------------------------- */
+
+:focus-visible {
+    outline: 2px solid var(--accent-indigo);
+    outline-offset: 2px;
+    border-radius: 4px;
+}
+button:focus:not(:focus-visible), input:focus:not(:focus-visible) { outline: none; }
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}
+
+/* --- 15. Consistency fixes ---------------------------------------------- */
+
+/* Long unbroken strings (URLs, request ids) must never overflow bubbles */
+.msg-bubble, .doc-content-block, .debug-card .content { overflow-wrap: anywhere; }
+
+/* NOTE: no scroll-behavior:smooth on .chat-history — smooth animation makes
+   the per-chunk auto-scroll lag behind streamed responses. */
+
+/* Uniform border-radius rhythm on interactive chips */
+.prompt-chip, .library-stat-chip, .tag { border-radius: 8px; }
+
+/* Prevent jarring pop when the pipeline details panel opens */
+.pipeline-badge-details { animation: float-up 0.25s ease; }

@@ -709,6 +709,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const copyBtn = document.createElement("button");
         copyBtn.className = "msg-copy-btn";
         copyBtn.title = "Copy answer";
+        copyBtn.setAttribute("aria-label", "Copy answer to clipboard");
         copyBtn.innerHTML = '<i class="fa-regular fa-copy"></i>';
         copyBtn.addEventListener("click", () => {
             navigator.clipboard.writeText(doneData.answer).then(() => {
@@ -767,6 +768,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const copyBtn = document.createElement("button");
         copyBtn.className = "msg-copy-btn";
         copyBtn.title = "Copy answer";
+        copyBtn.setAttribute("aria-label", "Copy answer to clipboard");
         copyBtn.innerHTML = '<i class="fa-regular fa-copy"></i>';
         copyBtn.addEventListener("click", () => {
             navigator.clipboard.writeText(data.answer).then(() => {
@@ -1696,10 +1698,83 @@ document.addEventListener("DOMContentLoaded", () => {
         conversationHistory = "";
         currentSessionDocs = {};
         updateProviderStatus();
-        loadChatHistory();
+        showHistorySkeleton();
+        loadChatHistory().finally(hideHistorySkeleton);
         loadDocuments();
         loadEvaluationHistory();
     }
+
+    // ----------------------------------------------------------------
+    // Phase A polish: ripple, skeletons, keyboard, a11y (UI-only)
+    // ----------------------------------------------------------------
+
+    // Lightweight ripple on primary buttons (respects reduced-motion)
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (!reducedMotion) {
+        document.addEventListener("pointerdown", e => {
+            // .nav-btn excluded: its active-indicator bar sits outside the
+            // button bounds and overflow:hidden (ripple-host) would clip it.
+            const host = e.target.closest(
+                ".action-btn, .action-btn-secondary, .submit-btn, .sso-btn, .prompt-chip");
+            if (!host) return;
+            host.classList.add("ripple-host");
+            const rect = host.getBoundingClientRect();
+            const size = Math.max(rect.width, rect.height);
+            const ripple = document.createElement("span");
+            ripple.className = "ripple";
+            ripple.style.width = ripple.style.height = `${size}px`;
+            ripple.style.left = `${e.clientX - rect.left - size / 2}px`;
+            ripple.style.top  = `${e.clientY - rect.top  - size / 2}px`;
+            host.appendChild(ripple);
+            setTimeout(() => ripple.remove(), 600);
+        });
+    }
+
+    // Skeleton bubbles while chat history loads
+    function showHistorySkeleton() {
+        const wrap = document.createElement("div");
+        wrap.id = "history-skeleton";
+        wrap.innerHTML = [64, 42, 55].map(w => `
+            <div class="skeleton-msg" aria-hidden="true">
+                <div class="skeleton skeleton-avatar"></div>
+                <div class="skeleton-lines">
+                    <div class="skeleton" style="width:${w}%"></div>
+                    <div class="skeleton" style="width:${Math.round(w * 0.7)}%"></div>
+                </div>
+            </div>`).join("");
+        chatHistory.appendChild(wrap);
+    }
+    function hideHistorySkeleton() {
+        const el = document.getElementById("history-skeleton");
+        if (el) el.remove();
+    }
+
+    // Escape closes modals and the profile dropdown
+    document.addEventListener("keydown", e => {
+        if (e.key !== "Escape") return;
+        document.querySelectorAll(".modal.active").forEach(m => m.classList.remove("active"));
+        const dropdown = document.getElementById("user-menu-dropdown");
+        if (dropdown && dropdown.style.display !== "none") {
+            dropdown.style.display = "none";
+            const trigger = document.getElementById("user-menu-trigger");
+            if (trigger) trigger.setAttribute("aria-expanded", "false");
+        }
+    });
+
+    // ARIA labels for icon-only controls created in markup
+    const ariaLabels = {
+        "submit-btn": "Send question",
+        "close-modal-btn": "Close document viewer",
+        "close-profile-modal-btn": "Close profile",
+        "clear-chat-btn": "Clear chat history",
+    };
+    Object.entries(ariaLabels).forEach(([id, label]) => {
+        const el = document.getElementById(id);
+        if (el && !el.getAttribute("aria-label")) el.setAttribute("aria-label", label);
+    });
+    chatHistory.setAttribute("role", "log");
+    chatHistory.setAttribute("aria-live", "polite");
+    chatHistory.setAttribute("aria-label", "Chat conversation");
 
     Auth.init(startApp);
 });
