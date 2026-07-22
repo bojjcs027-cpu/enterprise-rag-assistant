@@ -12,13 +12,18 @@
     <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="/static/index.css?v=phased2">
-    <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- Mammoth.js — client-side DOCX -> HTML conversion for the Knowledge Library preview -->
-    <script src="https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js" defer></script>
+    <link rel="stylesheet" href="/static/index.css?v=phasee3">
+    <!-- Chart.js and Mammoth.js are lazy-loaded on first use (see app.js
+         ensureChartJs/ensureMammoth) — most sessions never open the DOCX
+         preview or a chart-bearing tab, so this saves a script fetch +
+         parse on every page load for those visits. -->
 </head>
 <body>
+    <!-- Offline indicator — shown when the browser reports no connectivity -->
+    <div class="offline-banner" id="offline-banner" role="status" aria-live="assertive">
+        <i class="fa-solid fa-wifi"></i> <span>You're offline — reconnecting will resume automatically.</span>
+    </div>
+
     <!-- Authentication Overlay (JWT login / signup) -->
     <div id="sso-overlay" class="sso-overlay active">
         <div class="sso-modal">
@@ -94,20 +99,20 @@
                 </div>
             </div>
             
-            <nav class="nav-menu">
-                <button class="nav-btn active" data-tab="chat-tab">
+            <nav class="nav-menu" role="tablist" aria-label="Dashboard sections">
+                <button class="nav-btn active" data-tab="chat-tab" role="tab" aria-selected="true" aria-controls="chat-tab">
                     <i class="fa-solid fa-comments"></i> <span>Ask Assistant</span>
                 </button>
-                <button class="nav-btn" data-tab="debug-tab">
+                <button class="nav-btn" data-tab="debug-tab" role="tab" aria-selected="false" aria-controls="debug-tab">
                     <i class="fa-solid fa-magnifying-glass-chart"></i> <span>Retrieval Debugger</span>
                 </button>
-                <button class="nav-btn" data-tab="eval-tab">
+                <button class="nav-btn" data-tab="eval-tab" role="tab" aria-selected="false" aria-controls="eval-tab">
                     <i class="fa-solid fa-chart-line"></i> <span>Evaluation Panel</span>
                 </button>
-                <button class="nav-btn" data-tab="docs-tab">
+                <button class="nav-btn" data-tab="docs-tab" role="tab" aria-selected="false" aria-controls="docs-tab">
                     <i class="fa-solid fa-folder-open"></i> <span>Knowledge Library</span>
                 </button>
-                <button class="nav-btn" data-tab="admin-tab" id="admin-nav-btn" style="display:none;">
+                <button class="nav-btn" data-tab="admin-tab" id="admin-nav-btn" role="tab" aria-selected="false" aria-controls="admin-tab" style="display:none;">
                     <i class="fa-solid fa-gauge-high"></i> <span>Admin Dashboard</span>
                 </button>
             </nav>
@@ -147,7 +152,7 @@
         <main class="main-content">
             
             <!-- CHAT WORKSPACE TAB -->
-            <section id="chat-tab" class="tab-pane active">
+            <section id="chat-tab" class="tab-pane active" role="tabpanel" aria-labelledby="chat-tab" tabindex="0">
                 <header class="tab-header">
                     <div class="header-titles">
                         <h2>Compliance AI Assistant</h2>
@@ -200,7 +205,7 @@
             </section>
 
             <!-- RETRIEVAL DEBUGGER TAB -->
-            <section id="debug-tab" class="tab-pane">
+            <section id="debug-tab" class="tab-pane" role="tabpanel" aria-labelledby="debug-tab" tabindex="0">
                 <header class="tab-header">
                     <div class="header-titles">
                         <h2>Retrieval Step Inspector</h2>
@@ -228,7 +233,7 @@
             </section>
 
             <!-- EVALUATION PANEL TAB -->
-            <section id="eval-tab" class="tab-pane">
+            <section id="eval-tab" class="tab-pane" role="tabpanel" aria-labelledby="eval-tab" tabindex="0">
                 <header class="tab-header">
                     <div class="header-titles">
                         <h2>CI/CD Evaluation Analytics</h2>
@@ -345,7 +350,7 @@
             </section>
 
             <!-- KNOWLEDGE LIBRARY TAB -->
-            <section id="docs-tab" class="tab-pane">
+            <section id="docs-tab" class="tab-pane" role="tabpanel" aria-labelledby="docs-tab" tabindex="0">
                 <header class="tab-header">
                     <div class="header-titles">
                         <h2>Knowledge Library</h2>
@@ -357,8 +362,11 @@
                     <div class="upload-section">
                         <div class="upload-card" id="drop-zone">
                             <i class="fa-solid fa-cloud-arrow-up" id="upload-icon"></i>
-                            <h3>Upload New Policy Document</h3>
-                            <p>Drag and drop files (<code>.md</code>, <code>.txt</code>, <code>.pdf</code>, <code>.docx</code>), or click to browse &middot; max 25&nbsp;MB each</p>
+                            <div class="drop-default">
+                                <h3>Upload New Policy Document</h3>
+                                <p>Drag and drop files (<code>.md</code>, <code>.txt</code>, <code>.pdf</code>, <code>.docx</code>), or click to browse &middot; max 25&nbsp;MB each</p>
+                            </div>
+                            <h3 class="drop-hint">Drop to upload</h3>
                             <input type="file" id="file-uploader" accept=".md,.txt,.pdf,.docx" multiple style="display: none;">
                             <div id="upload-status" class="upload-status"></div>
                         </div>
@@ -439,7 +447,7 @@
             </section>
 
             <!-- ADMIN DASHBOARD TAB (admin-only) -->
-            <section id="admin-tab" class="tab-pane">
+            <section id="admin-tab" class="tab-pane" role="tabpanel" aria-labelledby="admin-tab" tabindex="0">
                 <header class="tab-header">
                     <div class="header-titles">
                         <h2>Admin Dashboard</h2>
@@ -621,7 +629,7 @@
     <!-- Cache-busting query params: bump on every static asset change so
          browsers with heuristic caching (no explicit Cache-Control from the
          server) never serve a stale app.js/index.css after a deploy. -->
-    <script src="/static/auth.js?v=phased2" defer></script>
-    <script src="/static/app.js?v=phased2" defer></script>
+    <script src="/static/auth.js?v=phasee3" defer></script>
+    <script src="/static/app.js?v=phasee3" defer></script>
 </body>
 </html>

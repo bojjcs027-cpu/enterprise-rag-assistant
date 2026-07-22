@@ -16,20 +16,62 @@ document.addEventListener("DOMContentLoaded", () => {
     const tabPanes   = document.querySelectorAll(".tab-pane");
 
 
-    navButtons.forEach(btn => {
-        btn.addEventListener("click", () => {
-            const targetTab = btn.getAttribute("data-tab");
+    const navOrder = Array.from(navButtons).map(b => b.getAttribute("data-tab"));
 
-            navButtons.forEach(b => b.classList.remove("active"));
-            tabPanes.forEach(pane => pane.classList.remove("active"));
+    function switchTab(targetTab) {
+        const activePane = document.querySelector(".tab-pane.active");
+        const nextPane = document.getElementById(targetTab);
+        if (!nextPane || nextPane === activePane) return;
 
-            btn.classList.add("active");
-            document.getElementById(targetTab).classList.add("active");
+        // Directional slide+fade based on nav order — visiting a tab to the
+        // right slides in from the right, and vice versa, so the motion
+        // reads as spatial navigation rather than a generic cross-fade.
+        const fromIdx = activePane ? navOrder.indexOf(activePane.id) : -1;
+        const toIdx = navOrder.indexOf(targetTab);
+        const dir = toIdx > fromIdx ? "right" : "left";
 
-            if (targetTab === "eval-tab")  loadEvaluationHistory();
-            if (targetTab === "docs-tab")  loadDocuments();
-            if (targetTab === "admin-tab") loadAdminDashboard();
+        navButtons.forEach(b => {
+            const isTarget = b.getAttribute("data-tab") === targetTab;
+            b.classList.toggle("active", isTarget);
+            b.setAttribute("aria-selected", String(isTarget));
         });
+        tabPanes.forEach(pane => pane.classList.remove("active", "tab-enter-left", "tab-enter-right"));
+
+        nextPane.classList.add("active", `tab-enter-${dir}`);
+        const clearEnterClass = () => nextPane.classList.remove("tab-enter-left", "tab-enter-right");
+        nextPane.addEventListener("animationend", clearEnterClass, { once: true });
+        // animationend can be delayed or never fire in some backgrounded/
+        // automated rendering contexts (same class of issue as the rAF
+        // throttling fixed in animateCounter) — this guarantees the
+        // transient class is gone well after the 0.32s animation should
+        // have finished, regardless of whether the event itself arrives.
+        setTimeout(clearEnterClass, 500);
+
+        if (targetTab === "eval-tab")  loadEvaluationHistory();
+        if (targetTab === "docs-tab")  loadDocuments();
+        if (targetTab === "admin-tab") loadAdminDashboard();
+    }
+
+    navButtons.forEach(btn => {
+        btn.addEventListener("click", () => switchTab(btn.getAttribute("data-tab")));
+    });
+
+    // Keyboard navigation: Left/Right (or Up/Down) arrows move focus and
+    // switch tabs across the nav menu, matching the standard ARIA tablist
+    // pattern; Home/End jump to the first/last visible tab.
+    document.querySelector(".nav-menu").addEventListener("keydown", e => {
+        if (!["ArrowRight", "ArrowDown", "ArrowLeft", "ArrowUp", "Home", "End"].includes(e.key)) return;
+        const visible = Array.from(navButtons).filter(b => getComputedStyle(b).display !== "none");
+        const current = visible.indexOf(document.activeElement);
+        if (current === -1) return;
+        e.preventDefault();
+        let next;
+        if (e.key === "Home") next = 0;
+        else if (e.key === "End") next = visible.length - 1;
+        else if (e.key === "ArrowRight" || e.key === "ArrowDown") next = (current + 1) % visible.length;
+        else next = (current - 1 + visible.length) % visible.length;
+        visible[next].focus();
+        switchTab(visible[next].getAttribute("data-tab"));
     });
 
     // ----------------------------------------------------------------
@@ -144,6 +186,68 @@ document.addEventListener("DOMContentLoaded", () => {
         if (pct >= 70) return "conf-high";
         if (pct >= 40) return "conf-mid";
         return "conf-low";
+    }
+
+    // ------------------------------------------------------------------
+    // Lazy-loaded third-party scripts. Chart.js (eval/admin dashboards)
+    // and mammoth.js (DOCX preview) are only needed by a subset of visits,
+    // so they're fetched on first use instead of blocking every page load.
+    // ------------------------------------------------------------------
+    const _scriptPromises = {};
+    function loadScriptOnce(src) {
+        if (_scriptPromises[src]) return _scriptPromises[src];
+        _scriptPromises[src] = new Promise((resolve, reject) => {
+            const s = document.createElement("script");
+            s.src = src;
+            s.onload = () => resolve();
+            s.onerror = () => { delete _scriptPromises[src]; reject(new Error(`Failed to load ${src}`)); };
+            document.head.appendChild(s);
+        });
+        return _scriptPromises[src];
+    }
+    function ensureChartJs() {
+        if (window.Chart) return Promise.resolve();
+        return loadScriptOnce("https://cdn.jsdelivr.net/npm/chart.js");
+    }
+    function ensureMammoth() {
+        if (window.mammoth) return Promise.resolve();
+        return loadScriptOnce("https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js");
+    }
+
+    // ------------------------------------------------------------------
+    // Offline detection — a non-blocking banner (existing session state
+    // stays visible underneath) that appears when the browser reports no
+    // connectivity and disappears automatically on reconnect.
+    // ------------------------------------------------------------------
+    const offlineBanner = document.getElementById("offline-banner");
+    function updateOnlineState() {
+        if (offlineBanner) offlineBanner.classList.toggle("visible", !navigator.onLine);
+    }
+    window.addEventListener("online", updateOnlineState);
+    window.addEventListener("offline", updateOnlineState);
+    updateOnlineState();
+
+    // ------------------------------------------------------------------
+    // Global load-failure state — reserved for one precise, rare signal
+    // (see updateProviderStatus): the very first request to the backend
+    // fails at the network level, meaning the server is unreachable, not
+    // just slow (this app's own local-model warm-up can legitimately take
+    // 30+ seconds, which must never trip this).
+    // ------------------------------------------------------------------
+    function showAppLoadError(message) {
+        if (document.querySelector(".app-load-error")) return; // don't stack
+        const el = document.createElement("div");
+        el.className = "app-load-error";
+        el.setAttribute("role", "alert");
+        el.innerHTML = `
+            <i class="fa-solid fa-plug-circle-xmark"></i>
+            <h2>Connection Problem</h2>
+            <p>${escapeHTML(message)}</p>
+            <button type="button" class="action-btn" id="app-load-error-retry">
+                <i class="fa-solid fa-arrows-rotate"></i> Retry
+            </button>`;
+        document.body.appendChild(el);
+        el.querySelector("#app-load-error-retry").addEventListener("click", () => window.location.reload());
     }
 
     function escapeHTML(str) {
@@ -451,6 +555,12 @@ document.addEventListener("DOMContentLoaded", () => {
     const providerName      = document.getElementById("active-provider-name");
     const systemStatsPanel  = document.getElementById("system-stats-panel");
 
+    // Only the very first status check can trigger the full-screen error
+    // state — later transient failures (a single dropped request mid-session)
+    // just fall back to the existing soft "Connecting…" degradation below,
+    // so one network blip never interrupts an otherwise-working session.
+    let firstStatusCheckDone = false;
+
     async function updateProviderStatus() {
         try {
             const res = await Auth.fetch("/api/status");
@@ -494,6 +604,16 @@ document.addEventListener("DOMContentLoaded", () => {
         } catch (err) {
             console.error("Provider status error:", err);
             providerName.innerText = "Connecting…";
+            // A TypeError from fetch() means the request never reached the
+            // server (DNS/connection failure) — distinct from an HTTP error
+            // status, which means the server IS reachable. Only escalate to
+            // the full-screen state on this specific, unambiguous signal,
+            // and only on the first attempt (see comment above).
+            if (!firstStatusCheckDone && err instanceof TypeError) {
+                showAppLoadError("Can't reach the OmniGuard server. Check your connection and try again.");
+            }
+        } finally {
+            firstStatusCheckDone = true;
         }
     }
 
@@ -1454,6 +1574,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     async function loadEvaluationHistory() {
         try {
+            await ensureChartJs();
             const res     = await Auth.fetch("/api/evaluate/history");
             const history = await res.json();
             if (!history || history.length === 0) return;
@@ -1744,6 +1865,7 @@ document.addEventListener("DOMContentLoaded", () => {
     async function loadAdminDashboard() {
         if (!Auth.isAdmin()) return;
         try {
+            await ensureChartJs();
             const [usersRes, libRes, metricsRes, evalRes] = await Promise.all([
                 Auth.fetch("/api/auth/users"),
                 Auth.fetch("/api/library"),
@@ -1897,7 +2019,16 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     const adminRefreshBtn = document.getElementById("admin-refresh-btn");
-    if (adminRefreshBtn) adminRefreshBtn.addEventListener("click", loadAdminDashboard);
+    if (adminRefreshBtn) adminRefreshBtn.addEventListener("click", async () => {
+        adminRefreshBtn.classList.add("btn-loading");
+        adminRefreshBtn.disabled = true;
+        try {
+            await loadAdminDashboard();
+        } finally {
+            adminRefreshBtn.classList.remove("btn-loading");
+            adminRefreshBtn.disabled = false;
+        }
+    });
 
     // ----------------------------------------------------------------
     // 4. KNOWLEDGE LIBRARY
@@ -1986,13 +2117,26 @@ document.addEventListener("DOMContentLoaded", () => {
     function showPipeline(fileNames) {
         pipelineFiles.innerHTML = fileNames.map(n => {
             const ext = (n.split(".").pop() || "").toLowerCase();
-            return `<span class="tag queued-file-chip"><i class="${fileIconClass(ext)}"></i> ${escapeHTML(n)}</span>`;
+            return `<span class="tag queued-file-chip" data-filename="${escapeHTML(n)}"><i class="${fileIconClass(ext)}"></i> ${escapeHTML(n)}</span>`;
         }).join(" ");
         pipelinePanel.style.display = "block";
         progressTrack.style.display = "block";
         progressFill.style.width = "0%";
         progressLabel.textContent = "";
         renderStepper(0);
+    }
+
+    // Appends a per-file done/failed mark to its queued-file chip as the
+    // batch status poll resolves each document (nice at-a-glance state for
+    // multi-file uploads, since files can finish at different times).
+    function markQueuedFile(filename, status) {
+        const chip = pipelineFiles.querySelector(`.queued-file-chip[data-filename="${CSS.escape(filename)}"]`);
+        if (!chip || chip.querySelector(".stage-mark")) return;
+        const mark = document.createElement("i");
+        mark.className = status === "failed"
+            ? "fa-solid fa-circle-xmark stage-mark mark-failed"
+            : "fa-solid fa-circle-check stage-mark mark-done";
+        chip.appendChild(mark);
     }
 
     function hidePipelineSoon(delayMs = 4000) {
@@ -2044,6 +2188,10 @@ document.addEventListener("DOMContentLoaded", () => {
             const res = await Auth.fetch(`/api/library/status?ids=${idsParam}`);
             if (!res.ok) throw new Error("Failed to fetch processing status.");
             const data = await res.json();
+
+            data.documents.forEach(d => {
+                if (d.status === "completed" || d.status === "failed") markQueuedFile(d.filename, d.status);
+            });
 
             const failed = data.documents.filter(d => d.status === "failed");
             if (failed.length) {
@@ -2489,7 +2637,11 @@ document.addEventListener("DOMContentLoaded", () => {
                 previewWrap.appendChild(iframe);
 
             } else if (doc.file_type === "docx") {
-                if (!window.mammoth) throw new Error("DOCX preview library failed to load.");
+                try {
+                    await ensureMammoth();
+                } catch (loadErr) {
+                    throw new Error("DOCX preview library failed to load. Check your connection and retry.");
+                }
                 const arrayBuffer = await blob.arrayBuffer();
                 // mammoth's conversion has been observed to hang indefinitely
                 // in some browser/automation environments — never let a
@@ -2588,8 +2740,10 @@ document.addEventListener("DOMContentLoaded", () => {
         updateProviderStatus();
         showHistorySkeleton();
         loadChatHistory().finally(hideHistorySkeleton);
-        loadDocuments();
-        loadEvaluationHistory();
+        // Evaluation history and Admin Dashboard data load on-demand when
+        // their tab is first opened (see switchTab) — same as the Knowledge
+        // Library — so Chart.js is never fetched for sessions that stay on
+        // the chat/debugger tabs.
     }
 
     // ----------------------------------------------------------------

@@ -309,21 +309,8 @@ h1, h2, h3, h4, h5, h6 {
     padding-right: 8px;
 }
 
-/* Custom Scrollbar */
-::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-}
-::-webkit-scrollbar-track {
-    background: transparent;
-}
-::-webkit-scrollbar-thumb {
-    background: var(--bg-tertiary);
-    border-radius: 10px;
-}
-::-webkit-scrollbar-thumb:hover {
-    background: var(--text-muted);
-}
+/* Scrollbar styling consolidated in "9. Scrollbars" (Phase A section) below —
+   that block sets scrollbar-width too and is the single source of truth. */
 
 .message {
     display: flex;
@@ -1122,38 +1109,10 @@ h1, h2, h3, h4, h5, h6 {
     text-align: left;
 }
 
-/* Copy-to-clipboard button on assistant bubbles */
-.msg-copy-btn {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    background: var(--bg-tertiary);
-    border: 1px solid var(--border-color);
-    color: var(--text-muted);
-    border-radius: 6px;
-    width: 28px;
-    height: 28px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    font-size: 12px;
-    opacity: 0;
-    transition: var(--transition-smooth);
-}
+/* Note: the old absolutely-positioned .msg-copy-btn was superseded in
+   Phase B by the .msg-actions row (Copy + Regenerate); see that section. */
 .message.system-msg .msg-bubble {
     position: relative;
-}
-.message.system-msg .msg-bubble:hover .msg-copy-btn {
-    opacity: 1;
-}
-.msg-copy-btn:hover {
-    color: var(--text-primary);
-    border-color: var(--accent-indigo);
-}
-.msg-copy-btn.copied {
-    color: var(--accent-success);
-    border-color: var(--accent-success);
 }
 
 /* Character counter */
@@ -1214,23 +1173,6 @@ h1, h2, h3, h4, h5, h6 {
     flex-wrap: wrap;
     background: rgba(0, 0, 0, 0.15);
     border-top: 1px solid var(--border-color);
-}
-.pb-step {
-    color: var(--text-secondary);
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    font-size: 12px;
-}
-.pb-step i {
-    color: var(--accent-indigo);
-    font-size: 11px;
-}
-.pb-step strong {
-    color: var(--text-primary);
-}
-.pb-provider {
-    color: var(--accent-violet);
 }
 .pb-arrow {
     color: var(--text-muted);
@@ -1575,18 +1517,6 @@ h1, h2, h3, h4, h5, h6 {
 /* =========================================================
    User Badge (Sidebar)
    ========================================================= */
-.user-badge {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 10px 12px;
-    background-color: var(--bg-tertiary);
-    border: 1px solid var(--border-color);
-    border-radius: 12px;
-    margin-bottom: 14px;
-    animation: float-up 0.4s ease forwards;
-}
-
 .user-badge-avatar {
     width: 34px;
     height: 34px;
@@ -1622,13 +1552,6 @@ h1, h2, h3, h4, h5, h6 {
     font-weight: 500;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-}
-
-.user-badge-status {
-    font-size: 8px;
-    color: var(--accent-success);
-    animation: pulse-glow 2s infinite;
-    flex-shrink: 0;
 }
 
 /* ============================================================
@@ -2283,7 +2206,7 @@ h1, h2, h3, h4, h5, h6 { letter-spacing: -0.015em; line-height: 1.25; }
 
 .action-btn, .action-btn-secondary, .submit-btn, .sso-btn,
 .pipeline-badge-toggle, .citation-item-btn, .prompt-chip,
-.msg-copy-btn, .close-modal-btn, .auth-switch-btn, .expand-text-btn {
+.close-modal-btn, .auth-switch-btn, .expand-text-btn {
     transition: transform 0.15s ease, box-shadow 0.25s ease,
                 background 0.25s ease, color 0.25s ease, border-color 0.25s ease;
 }
@@ -3400,4 +3323,116 @@ button:focus:not(:focus-visible), input:focus:not(:focus-visible) { outline: non
     .admin-stats-grid { grid-template-columns: repeat(2, 1fr); }
     .admin-api-chips { gap: 8px; }
     .admin-api-chip { min-width: 100px; flex: 1 1 40%; }
+}
+
+/* ==========================================================================
+   PHASE E — FINAL POLISH LAYER (v1.1)
+   Directional tab transitions, glassmorphism extension, offline/error
+   states, drag-hint, per-file upload marks. Existing palette only.
+   ========================================================================== */
+
+/* --- Directional tab transitions (page/slide/fade) ------------------------ */
+
+.tab-pane.tab-enter-right { animation: tabSlideRight 0.32s cubic-bezier(0.16, 1, 0.3, 1); }
+.tab-pane.tab-enter-left  { animation: tabSlideLeft  0.32s cubic-bezier(0.16, 1, 0.3, 1); }
+@keyframes tabSlideRight {
+    from { opacity: 0; transform: translateX(18px) scale(0.99); }
+    to   { opacity: 1; transform: translateX(0) scale(1); }
+}
+@keyframes tabSlideLeft {
+    from { opacity: 0; transform: translateX(-18px) scale(0.99); }
+    to   { opacity: 1; transform: translateX(0) scale(1); }
+}
+
+/* --- Glassmorphism: extend the existing --bg-glass technique to more
+   surfaces (same variable already used by .metric-card / .sso-modal /
+   .chat-form / .msg-bubble — no new colors introduced). ------------------- */
+
+.chart-panel, .eval-history-panel, .doc-file-card, .gauge-card, .debug-card {
+    background-color: var(--bg-glass);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+}
+
+/* --- Drag-and-drop hint (Knowledge Library) -------------------------------- */
+
+.upload-card .drop-hint {
+    display: none;
+    font-weight: 600;
+    color: var(--accent-indigo);
+    margin: 0;
+}
+.upload-card.drag-active .drop-hint    { display: block; }
+.upload-card.drag-active .drop-default { display: none; }
+
+/* --- Per-file upload completion marks -------------------------------------- */
+
+.upload-pipeline-files .queued-file-chip { position: relative; padding-right: 10px; }
+.upload-pipeline-files .queued-file-chip .stage-mark {
+    font-size: 0.75rem;
+    margin-left: 4px;
+    animation: float-up 0.25s ease;
+}
+.upload-pipeline-files .queued-file-chip .stage-mark.mark-done   { color: var(--accent-success); }
+.upload-pipeline-files .queued-file-chip .stage-mark.mark-failed { color: var(--accent-danger); }
+
+/* --- Offline overlay --------------------------------------------------------- */
+
+.offline-banner {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 4000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 10px 16px;
+    background: var(--accent-danger);
+    color: #fff;
+    font-size: 0.85rem;
+    font-weight: 600;
+    transform: translateY(-100%);
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.offline-banner.visible { transform: translateY(0); }
+.offline-banner i { animation: pulse-glow 1.6s ease-in-out infinite; }
+
+/* --- Global load-failure state ------------------------------------------------ */
+
+.app-load-error {
+    position: fixed;
+    inset: 0;
+    z-index: 5000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    text-align: center;
+    background: var(--bg-primary);
+    padding: 24px;
+}
+.app-load-error i {
+    font-size: 2.6rem;
+    color: var(--accent-danger);
+}
+.app-load-error h2 { color: var(--text-primary); }
+.app-load-error p { color: var(--text-muted); max-width: 46ch; }
+.app-load-error .action-btn { margin-top: 8px; }
+
+/* --- Focus polish for elements added in later phases ------------------------- */
+
+.toolbar-select:focus-visible,
+.view-toggle-btn:focus-visible,
+.preview-tool-btn:focus-visible,
+.msg-action-btn:focus-visible,
+.nav-btn:focus-visible {
+    outline: 2px solid var(--accent-indigo);
+    outline-offset: 2px;
+}
+
+/* --- Reduced motion: also silence the new directional transitions ------------ */
+
+@media (prefers-reduced-motion: reduce) {
+    .tab-pane.tab-enter-right, .tab-pane.tab-enter-left { animation: none; }
 }
