@@ -148,16 +148,26 @@
                         <h2>Compliance AI Assistant</h2>
                         <p>Search corporate policy documentation with strict citation enforcement.</p>
                     </div>
-                    <button class="action-btn-secondary" id="clear-chat-btn"><i class="fa-solid fa-trash-can"></i> Clear History</button>
+                    <div class="chat-header-actions">
+                        <button class="action-btn-secondary" id="share-chat-btn" title="Share conversation (copies Markdown)"><i class="fa-solid fa-share-nodes"></i> <span>Share</span></button>
+                        <button class="action-btn-secondary" id="export-chat-btn" title="Export conversation as Markdown (Ctrl+Shift+E)"><i class="fa-solid fa-file-arrow-down"></i> <span>Export</span></button>
+                        <button class="action-btn-secondary" id="clear-chat-btn"><i class="fa-solid fa-trash-can"></i> <span>Clear History</span></button>
+                    </div>
                 </header>
 
                 <div class="chat-wrapper">
                     <div class="chat-history" id="chat-history-container">
                         <!-- Welcome message -->
-                        <div class="message system-msg">
-                            <div class="msg-avatar"><i class="fa-solid fa-robot"></i></div>
+                        <div class="message system-msg welcome-msg">
+                            <div class="msg-avatar ai-avatar"><i class="fa-solid fa-robot"></i></div>
                             <div class="msg-bubble">
-                                <p>Welcome to OmniGuard Ask-My-Docs! I am configured with hybrid search retrieval (BM25 + FAISS Vector) and Cross-Encoder reranking.</p>
+                                <p class="welcome-title">Welcome to OmniGuard Ask-My-Docs!</p>
+                                <p>I am configured with hybrid search retrieval (BM25 + FAISS Vector) and Cross-Encoder reranking.</p>
+                                <div class="welcome-capabilities">
+                                    <span class="capability-chip"><i class="fa-solid fa-magnifying-glass"></i> Hybrid Search</span>
+                                    <span class="capability-chip"><i class="fa-solid fa-quote-left"></i> Cited Answers</span>
+                                    <span class="capability-chip"><i class="fa-solid fa-bolt"></i> Semantic Cache</span>
+                                </div>
                                 <p>Ask me any question regarding AWS IAM, KMS encryption, VPC configs, remote work VPNs, or data classification.</p>
                                 <div class="quick-prompts">
                                     <span class="prompt-chip" data-query="What are the AWS IAM password and MFA policies?">AWS IAM &amp; MFA Policy</span>
@@ -171,10 +181,13 @@
                     
                     <div class="chat-input-area">
                         <form id="chat-form" class="chat-form">
-                            <input type="text" id="query-input" placeholder="Ask a policy question… (Ctrl+Enter to send)" required autocomplete="off" maxlength="500">
+                            <textarea id="query-input" placeholder="Ask a policy question…" required maxlength="500" rows="1" autocomplete="off"></textarea>
                             <button type="submit" class="submit-btn" id="submit-btn"><i class="fa-solid fa-paper-plane"></i></button>
                         </form>
                         <div class="input-footer">
+                            <span class="input-hints">
+                                <kbd>Enter</kbd> send &middot; <kbd>Shift+Enter</kbd> newline &middot; <kbd>/</kbd> focus
+                            </span>
                             <span id="char-counter" class="char-counter">0 / 500</span>
                         </div>
                     </div>
