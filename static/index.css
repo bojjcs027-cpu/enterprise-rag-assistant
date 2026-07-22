@@ -3207,3 +3207,197 @@ button:focus:not(:focus-visible), input:focus:not(:focus-visible) { outline: non
     .preview-modal-content { width: 100vw; height: 100vh; max-height: 100vh; border-radius: 0; }
     .preview-modal-body { padding: 12px; }
 }
+
+/* ==========================================================================
+   PHASE D — DASHBOARD LAYER (v1.1)
+   Admin Dashboard (new), Evaluation gauges, Retrieval Debugger polish.
+   Existing palette only.
+   ========================================================================== */
+
+/* --- Shared: animated-counter pulse on update ---------------------------- */
+
+.counter-pulse { animation: counterPulse 0.4s ease; }
+@keyframes counterPulse {
+    0%   { transform: scale(1); }
+    30%  { transform: scale(1.08); }
+    100% { transform: scale(1); }
+}
+
+/* --- Admin: layout --------------------------------------------------------- */
+
+.admin-container {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+.admin-stats-grid {
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+}
+.admin-charts-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+}
+.admin-chart-canvas { height: 220px; }
+.admin-split-row {
+    display: grid;
+    grid-template-columns: 1.3fr 1fr;
+    gap: 20px;
+    align-items: start;
+}
+.admin-users-panel .table-container { max-height: 360px; }
+
+/* --- Admin: stat cards (extends .metric-card, no new colors) -------------- */
+
+.admin-stats-grid .metric-card { position: relative; overflow: hidden; }
+.admin-stats-grid .metric-card .card-value { font-variant-numeric: tabular-nums; }
+.admin-stats-grid .metric-card .card-sub {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    margin-top: 2px;
+}
+
+/* --- Admin: API usage chips -------------------------------------------------- */
+
+.admin-api-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 4px;
+}
+.admin-api-chip {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 10px 16px;
+    min-width: 130px;
+}
+.admin-api-chip .chip-label {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+.admin-api-chip .chip-value {
+    font-family: 'Outfit', sans-serif;
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+}
+.admin-api-chip.chip-good .chip-value { color: var(--accent-success); }
+.admin-api-chip.chip-warn .chip-value { color: var(--accent-warning); }
+.admin-api-chip.chip-bad  .chip-value { color: var(--accent-danger); }
+
+/* --- Admin: activity feed --------------------------------------------------- */
+
+.admin-activity-feed {
+    display: flex;
+    flex-direction: column;
+    max-height: 360px;
+    overflow-y: auto;
+}
+.activity-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 10px 4px;
+    border-bottom: 1px solid var(--border-color);
+    animation: float-up 0.3s ease;
+}
+.activity-item:last-child { border-bottom: none; }
+.activity-icon {
+    width: 30px; height: 30px;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 0.8rem;
+}
+.activity-icon.icon-upload   { background: rgba(129,140,248,0.12); color: var(--accent-indigo); }
+.activity-icon.icon-complete { background: rgba(16,185,129,0.12); color: var(--accent-success); }
+.activity-icon.icon-failed   { background: rgba(239,68,68,0.12);  color: var(--accent-danger); }
+.activity-icon.icon-eval     { background: rgba(245,158,11,0.12); color: var(--accent-warning); }
+.activity-text { flex: 1; min-width: 0; font-size: 0.84rem; color: var(--text-secondary); }
+.activity-text strong { color: var(--text-primary); }
+.activity-time { font-size: 0.72rem; color: var(--text-muted); white-space: nowrap; }
+.admin-empty-note {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    text-align: center;
+    padding: 20px 8px;
+}
+
+/* --- Evaluation: gauges ----------------------------------------------------- */
+
+.gauge-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 20px;
+}
+.gauge-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 18px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 4px;
+    transition: box-shadow 0.3s ease, border-color 0.3s ease;
+}
+.gauge-card:hover { box-shadow: var(--shadow-md); border-color: var(--border-glow); }
+.gauge-svg-wrap svg { display: block; }
+.gauge-svg-wrap .gauge-value-text {
+    font-family: 'Outfit', sans-serif;
+    font-weight: 700;
+    font-size: 28px;
+    fill: var(--text-primary);
+}
+.gauge-title { font-weight: 600; color: var(--text-primary); margin-top: 6px; }
+.gauge-desc { font-size: 0.78rem; color: var(--text-muted); max-width: 32ch; }
+
+/* --- Retrieval Debugger: confidence colors + mini key/value table --------- */
+
+.tag.conf-high { color: var(--accent-success); border-color: rgba(16,185,129,0.3); background: rgba(16,185,129,0.1); }
+.tag.conf-mid  { color: var(--accent-warning); border-color: rgba(245,158,11,0.3); background: rgba(245,158,11,0.1); }
+.tag.conf-low  { color: var(--accent-danger);  border-color: rgba(239,68,68,0.3);  background: rgba(239,68,68,0.1); }
+
+.debug-kv-table {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    row-gap: 3px;
+    column-gap: 10px;
+    margin: 8px 0 2px;
+    font-size: 0.78rem;
+}
+.debug-kv-table .kv-label { color: var(--text-muted); }
+.debug-kv-table .kv-value {
+    color: var(--text-secondary);
+    font-family: 'Consolas', 'Monaco', monospace;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+.debug-kv-table .kv-row-alt .kv-label,
+.debug-kv-table .kv-row-alt .kv-value { color: var(--text-primary); }
+
+/* --- Responsive ------------------------------------------------------------- */
+
+@media (max-width: 1200px) {
+    .admin-charts-row { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 900px) {
+    .admin-charts-row { grid-template-columns: 1fr; }
+    .admin-split-row { grid-template-columns: 1fr; }
+    .gauge-row { grid-template-columns: 1fr; }
+}
+@media (max-width: 640px) {
+    .admin-stats-grid { grid-template-columns: repeat(2, 1fr); }
+    .admin-api-chips { gap: 8px; }
+    .admin-api-chip { min-width: 100px; flex: 1 1 40%; }
+}

@@ -12,7 +12,7 @@
     <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="/static/index.css?v=phasec1">
+    <link rel="stylesheet" href="/static/index.css?v=phased2">
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- Mammoth.js — client-side DOCX -> HTML conversion for the Knowledge Library preview -->
@@ -106,6 +106,9 @@
                 </button>
                 <button class="nav-btn" data-tab="docs-tab">
                     <i class="fa-solid fa-folder-open"></i> <span>Knowledge Library</span>
+                </button>
+                <button class="nav-btn" data-tab="admin-tab" id="admin-nav-btn" style="display:none;">
+                    <i class="fa-solid fa-gauge-high"></i> <span>Admin Dashboard</span>
                 </button>
             </nav>
 
@@ -238,6 +241,20 @@
                 </header>
 
                 <div class="eval-container">
+                    <!-- Headline gauges — Faithfulness + Hallucination, rendered by JS -->
+                    <div class="gauge-row" id="eval-gauge-row">
+                        <div class="gauge-card">
+                            <div class="gauge-svg-wrap" id="faithfulness-gauge"></div>
+                            <span class="gauge-title">Faithfulness</span>
+                            <p class="gauge-desc">How well the answer stays grounded in retrieved context</p>
+                        </div>
+                        <div class="gauge-card">
+                            <div class="gauge-svg-wrap" id="hallucination-gauge"></div>
+                            <span class="gauge-title">Hallucination Risk</span>
+                            <p class="gauge-desc">Inverse of faithfulness — lower is better</p>
+                        </div>
+                    </div>
+
                     <!-- Metric Cards — 6 cards rendered by JS -->
                     <div class="metrics-grid" id="metrics-cards-container">
                         <div class="metric-card">
@@ -421,6 +438,63 @@
                 </div>
             </section>
 
+            <!-- ADMIN DASHBOARD TAB (admin-only) -->
+            <section id="admin-tab" class="tab-pane">
+                <header class="tab-header">
+                    <div class="header-titles">
+                        <h2>Admin Dashboard</h2>
+                        <p>System-wide overview: users, documents, storage, API usage, and live activity.</p>
+                    </div>
+                    <button class="action-btn-secondary" id="admin-refresh-btn"><i class="fa-solid fa-arrows-rotate"></i> <span>Refresh</span></button>
+                </header>
+
+                <div class="admin-container">
+                    <!-- Stat cards — animated counters, rendered by JS -->
+                    <div class="metrics-grid admin-stats-grid" id="admin-stats-grid"></div>
+
+                    <!-- Charts row -->
+                    <div class="admin-charts-row">
+                        <div class="chart-panel">
+                            <div class="panel-header"><h3>Documents by Type</h3></div>
+                            <div class="chart-wrapper-canvas admin-chart-canvas"><canvas id="adminDocsChart"></canvas></div>
+                        </div>
+                        <div class="chart-panel">
+                            <div class="panel-header"><h3>API Requests by Endpoint</h3></div>
+                            <div class="chart-wrapper-canvas admin-chart-canvas"><canvas id="adminApiChart"></canvas></div>
+                        </div>
+                        <div class="chart-panel">
+                            <div class="panel-header"><h3>Users by Role</h3></div>
+                            <div class="chart-wrapper-canvas admin-chart-canvas"><canvas id="adminUsersChart"></canvas></div>
+                        </div>
+                    </div>
+
+                    <!-- API usage detail chips -->
+                    <div class="panel-header"><h3>API Usage Detail</h3></div>
+                    <div class="admin-api-chips" id="admin-api-chips"></div>
+
+                    <!-- Users table + Recent Activity feed -->
+                    <div class="admin-split-row">
+                        <div class="chart-panel admin-users-panel">
+                            <div class="panel-header"><h3>Users</h3></div>
+                            <div class="table-container">
+                                <table class="history-table">
+                                    <thead>
+                                        <tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Joined</th></tr>
+                                    </thead>
+                                    <tbody id="admin-users-tbody">
+                                        <tr><td colspan="5" class="text-center">Loading…</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="chart-panel admin-activity-panel">
+                            <div class="panel-header"><h3>Recent Activity</h3></div>
+                            <div class="admin-activity-feed" id="admin-activity-feed"></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
         </main>
     </div>
 
@@ -547,7 +621,7 @@
     <!-- Cache-busting query params: bump on every static asset change so
          browsers with heuristic caching (no explicit Cache-Control from the
          server) never serve a stale app.js/index.css after a deploy. -->
-    <script src="/static/auth.js?v=phasec2" defer></script>
-    <script src="/static/app.js?v=phasec2" defer></script>
+    <script src="/static/auth.js?v=phased2" defer></script>
+    <script src="/static/app.js?v=phased2" defer></script>
 </body>
 </html>

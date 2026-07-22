@@ -28,6 +28,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             if (targetTab === "eval-tab")  loadEvaluationHistory();
             if (targetTab === "docs-tab")  loadDocuments();
+            if (targetTab === "admin-tab") loadAdminDashboard();
         });
     });
 
@@ -41,6 +42,108 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function formatTime() {
         return new Date().toLocaleString([], { hour: "2-digit", minute: "2-digit" });
+    }
+
+    function formatBytes(bytes) {
+        if (!bytes) return "0 KB";
+        const units = ["B", "KB", "MB", "GB"];
+        let i = 0, v = bytes;
+        while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
+        return `${v.toFixed(v >= 10 || i === 0 ? 0 : 1)} ${units[i]}`;
+    }
+
+    // Animates a numeric label from its current displayed value to `target`
+    // with an ease-out curve. Reused by the Admin Dashboard stat cards and
+    // the Evaluation metric cards. `render` formats the interpolated number
+    // for display (percent, seconds, plain integer, etc).
+    function animateCounter(el, target, render, duration = 700) {
+        const startVal = parseFloat(el.dataset.rawValue || "0") || 0;
+        if (!isFinite(target)) target = 0;
+        const startTime = performance.now();
+        el.dataset.rawValue = String(target);
+        let done = false;
+        function finish() {
+            if (done) return;
+            done = true;
+            el.textContent = render(target);
+        }
+        function tick(now) {
+            if (done) return;
+            const t = Math.min(1, (now - startTime) / duration);
+            const eased = 1 - Math.pow(1 - t, 3); // ease-out-cubic
+            el.textContent = render(startVal + (target - startVal) * eased);
+            if (t < 1) requestAnimationFrame(tick);
+            else finish();
+        }
+        requestAnimationFrame(tick);
+        // requestAnimationFrame is throttled or fully paused in some
+        // backgrounded/automated browser contexts — this guarantees the
+        // correct final value lands on schedule even if rAF never fires.
+        setTimeout(finish, duration + 150);
+        el.classList.remove("counter-pulse");
+        void el.offsetWidth;
+        el.classList.add("counter-pulse");
+    }
+
+    // ------------------------------------------------------------------
+    // Prometheus text-format parser — /metrics is exposed for scraping,
+    // not as JSON, so the Admin Dashboard reads and parses it client-side
+    // instead of requiring a new backend endpoint.
+    // ------------------------------------------------------------------
+    function parsePrometheusMetrics(text) {
+        const samples = [];
+        text.split("\n").forEach(line => {
+            if (!line || line.startsWith("#")) return;
+            const m = line.match(/^([a-zA-Z_:][a-zA-Z0-9_:]*)(\{([^}]*)\})?\s+([0-9.eE+\-]+|NaN|[+-]Inf)\s*$/);
+            if (!m) return;
+            const labels = {};
+            if (m[3]) {
+                m[3].split(",").forEach(pair => {
+                    const kv = pair.match(/^\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*"([^"]*)"\s*$/);
+                    if (kv) labels[kv[1]] = kv[2];
+                });
+            }
+            samples.push({ name: m[1], labels, value: parseFloat(m[4]) });
+        });
+        return samples;
+    }
+    function sumSamples(samples, name, labelFilter = null) {
+        return samples
+            .filter(s => s.name === name && (!labelFilter || Object.entries(labelFilter).every(([k, v]) => s.labels[k] === v)))
+            .reduce((acc, s) => acc + (isFinite(s.value) ? s.value : 0), 0);
+    }
+    function findSamples(samples, name) {
+        return samples.filter(s => s.name === name);
+    }
+
+    // Semi-circular SVG gauge (0-1 input). Color follows the same
+    // success/warning/danger thresholds used throughout the dashboard.
+    function renderGauge(container, value, { invert = false } = {}) {
+        const v = Math.max(0, Math.min(1, value || 0));
+        const effective = invert ? 1 - v : v;
+        const color = effective >= 0.75 ? "var(--accent-success)"
+                    : effective >= 0.5  ? "var(--accent-warning)"
+                    : "var(--accent-danger)";
+        const r = 70, cx = 90, cy = 90;
+        const startAngle = Math.PI, endAngle = Math.PI - Math.PI * v;
+        const x1 = cx + r * Math.cos(startAngle), y1 = cy + r * Math.sin(startAngle);
+        const x2 = cx + r * Math.cos(endAngle),   y2 = cy + r * Math.sin(endAngle);
+        const largeArc = v > 0.5 ? 1 : 0;
+        container.innerHTML = `
+            <svg viewBox="0 0 180 100" width="180" height="100">
+                <path d="M ${cx - r} ${cy} A ${r} ${r} 0 1 1 ${cx + r} ${cy}"
+                      fill="none" stroke="var(--bg-tertiary)" stroke-width="14" stroke-linecap="round"/>
+                <path d="M ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2}"
+                      fill="none" stroke="${color}" stroke-width="14" stroke-linecap="round"
+                      style="transition: d 0.6s ease;"/>
+                <text x="90" y="86" text-anchor="middle" class="gauge-value-text">${(v).toFixed(2)}</text>
+            </svg>`;
+    }
+
+    function confClass(pct) {
+        if (pct >= 70) return "conf-high";
+        if (pct >= 40) return "conf-mid";
+        return "conf-low";
     }
 
     function escapeHTML(str) {
@@ -1236,21 +1339,43 @@ document.addEventListener("DOMContentLoaded", () => {
                         el.innerText = text;
                         metricsRow.appendChild(el);
                     };
+                    // Better tables: secondary numeric details render as an
+                    // aligned label/value grid instead of loose pill tags —
+                    // easier to scan across cards than free-floating chips.
+                    const addKvTable = (rows) => {
+                        const kv = document.createElement("div");
+                        kv.className = "debug-kv-table";
+                        kv.innerHTML = rows.map(([label, value], i) =>
+                            `<span class="kv-label${i === 0 ? " kv-row-alt" : ""}">${escapeHTML(label)}</span>
+                             <span class="kv-value${i === 0 ? " kv-row-alt" : ""}">${escapeHTML(value)}</span>`
+                        ).join("");
+                        card.insertBefore(kv, metricsRow);
+                    };
 
                     if (col.key === "bm25") {
                         addTag(`BM25: ${fmtScore(item.bm25_score, 2)}`, "tag rrf-score-tag");
                     } else if (col.key === "vector") {
                         addTag(`Sim: ${fmtScore(item.vector_similarity, 3)}`, "tag rrf-score-tag");
-                        addTag(`L2: ${fmtScore(item.vector_distance, 2)}`);
+                        addKvTable([["L2 distance", fmtScore(item.vector_distance, 3)]]);
                     } else if (col.key === "rrf") {
                         addTag(`RRF: ${fmtScore(item.score, 4)}`, "tag rrf-score-tag");
-                        addTag(`V:${item.vector_rank ?? "—"} B:${item.bm25_rank ?? "—"}`);
-                        addTag(`BM25: ${fmtScore(item.bm25_score, 1)} · Sim: ${fmtScore(item.vector_similarity, 2)}`);
+                        addKvTable([
+                            ["Vector rank", item.vector_rank !== null && item.vector_rank !== undefined ? `#${item.vector_rank}` : "—"],
+                            ["BM25 rank",   item.bm25_rank   !== null && item.bm25_rank   !== undefined ? `#${item.bm25_rank}`   : "—"],
+                            ["BM25 score",  fmtScore(item.bm25_score, 2)],
+                            ["Vector sim",  fmtScore(item.vector_similarity, 3)],
+                        ]);
                     } else if (col.key === "reranked") {
+                        const confPct = item.confidence !== undefined ? item.confidence * 100 : null;
                         addTag(`CE: ${fmtScore(item.rerank_score, 3)}`, "tag rerank-score-tag");
-                        addTag(`Conf: ${item.confidence !== undefined ? (item.confidence * 100).toFixed(1) + "%" : "—"}`);
-                        addTag(`RRF: ${fmtScore(item.score, 4)}`);
-                        addTag(`Final #${item.final_rank ?? index + 1}`);
+                        addTag(
+                            confPct !== null ? `Conf: ${confPct.toFixed(1)}%` : "Conf: —",
+                            `tag ${confPct !== null ? confClass(confPct) : ""}`
+                        );
+                        addKvTable([
+                            ["RRF score",  fmtScore(item.score, 4)],
+                            ["Final rank", `#${item.final_rank ?? index + 1}`],
+                        ]);
                     }
 
                     // Score progress bar
@@ -1367,7 +1492,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     <i class="fa-solid fa-bullseye" style="color:#10B981;"></i>
                 </div>
                 <span class="card-label">Retrieval Recall</span>
-                <h3 class="card-value">${(run.mean_retrieval_recall * 100).toFixed(0)}%</h3>
+                <h3 class="card-value" data-fmt="pct0" data-target="${run.mean_retrieval_recall}">0%</h3>
                 <p class="card-desc">Ground-truth docs fetched ${deltaHtml(run.mean_retrieval_recall, prev?.mean_retrieval_recall)}</p>
             </div>
             <div class="metric-card pass">
@@ -1375,7 +1500,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     <i class="fa-solid fa-quote-left" style="color:#8B5CF6;"></i>
                 </div>
                 <span class="card-label">Citation Precision</span>
-                <h3 class="card-value">${(run.mean_citation_precision * 100).toFixed(0)}%</h3>
+                <h3 class="card-value" data-fmt="pct0" data-target="${run.mean_citation_precision}">0%</h3>
                 <p class="card-desc">Valid citations generated ${deltaHtml(run.mean_citation_precision, prev?.mean_citation_precision)}</p>
             </div>
             <div class="metric-card pass">
@@ -1383,7 +1508,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     <i class="fa-solid fa-brain" style="color:#3B82F6;"></i>
                 </div>
                 <span class="card-label">Faithfulness</span>
-                <h3 class="card-value">${(run.mean_faithfulness ?? 0).toFixed(2)}</h3>
+                <h3 class="card-value" data-fmt="dec2" data-target="${run.mean_faithfulness ?? 0}">0.00</h3>
                 <p class="card-desc">Answer alignment to context ${deltaHtml(run.mean_faithfulness, prev?.mean_faithfulness)}</p>
             </div>
             <div class="metric-card">
@@ -1391,7 +1516,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     <i class="fa-solid fa-ghost" style="color:#EF4444;"></i>
                 </div>
                 <span class="card-label">Hallucination</span>
-                <h3 class="card-value">${(run.mean_hallucination ?? 0).toFixed(2)}</h3>
+                <h3 class="card-value" data-fmt="dec2" data-target="${run.mean_hallucination ?? 0}">0.00</h3>
                 <p class="card-desc">Inverse of faithfulness score ${deltaHtml(run.mean_hallucination, prev?.mean_hallucination, false)}</p>
             </div>
             <div class="metric-card pass">
@@ -1399,7 +1524,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     <i class="fa-solid fa-trophy" style="color:#F59E0B;"></i>
                 </div>
                 <span class="card-label">Answer Relevance</span>
-                <h3 class="card-value">${(run.mean_answer_relevance ?? 0).toFixed(2)}</h3>
+                <h3 class="card-value" data-fmt="dec2" data-target="${run.mean_answer_relevance ?? 0}">0.00</h3>
                 <p class="card-desc">Semantic similarity to query ${deltaHtml(run.mean_answer_relevance, prev?.mean_answer_relevance)}</p>
             </div>
             <div class="metric-card">
@@ -1407,10 +1532,23 @@ document.addEventListener("DOMContentLoaded", () => {
                     <i class="fa-solid fa-stopwatch" style="color:#EF4444;"></i>
                 </div>
                 <span class="card-label">Mean Latency</span>
-                <h3 class="card-value">${run.mean_latency.toFixed(2)}s</h3>
+                <h3 class="card-value" data-fmt="sec2" data-target="${run.mean_latency}">0.00s</h3>
                 <p class="card-desc">Average generation time ${deltaHtml(run.mean_latency, prev?.mean_latency, false)}</p>
             </div>
         `;
+
+        const FMT = {
+            pct0: v => `${Math.round(v * 100)}%`,
+            dec2: v => v.toFixed(2),
+            sec2: v => `${v.toFixed(2)}s`,
+        };
+        document.querySelectorAll("#metrics-cards-container .card-value[data-target]").forEach(el => {
+            const target = parseFloat(el.dataset.target) || 0;
+            animateCounter(el, target, FMT[el.dataset.fmt] || (v => v.toFixed(2)));
+        });
+
+        renderGauge(document.getElementById("faithfulness-gauge"), run.mean_faithfulness ?? 0);
+        renderGauge(document.getElementById("hallucination-gauge"), run.mean_hallucination ?? 0, { invert: true });
     }
 
     function renderHistoryTable(history) {
@@ -1576,6 +1714,190 @@ document.addEventListener("DOMContentLoaded", () => {
             },
         });
     }
+
+    // ----------------------------------------------------------------
+    // ADMIN DASHBOARD — built entirely from existing endpoints
+    // (GET /api/auth/users, GET /api/library, GET /metrics) so no backend
+    // change is required. /metrics is Prometheus text format; parsed
+    // client-side via parsePrometheusMetrics().
+    // ----------------------------------------------------------------
+    let adminDocsChart = null, adminApiChart = null, adminUsersChart = null;
+    const CHART_COLORS = ["#818CF8", "#C084FC", "#10B981", "#F59E0B", "#EF4444", "#60A5FA"];
+
+    function renderAdminStatCard(icon, color, label, target, fmt, sub = "") {
+        const wrap = document.createElement("div");
+        wrap.className = "metric-card";
+        wrap.innerHTML = `
+            <div class="card-icon-wrap" style="background:${color}1F;"><i class="fa-solid ${icon}" style="color:${color};"></i></div>
+            <span class="card-label">${escapeHTML(label)}</span>
+            <h3 class="card-value">0</h3>
+            <p class="card-desc card-sub">${escapeHTML(sub)}</p>`;
+        document.getElementById("admin-stats-grid").appendChild(wrap);
+        animateCounter(wrap.querySelector(".card-value"), target, fmt);
+    }
+
+    function activityIcon(type) {
+        return { upload: "icon-upload fa-cloud-arrow-up", completed: "icon-complete fa-circle-check",
+                 failed: "icon-failed fa-circle-xmark", eval: "icon-eval fa-flask" }[type] || "icon-upload fa-circle-info";
+    }
+
+    async function loadAdminDashboard() {
+        if (!Auth.isAdmin()) return;
+        try {
+            const [usersRes, libRes, metricsRes, evalRes] = await Promise.all([
+                Auth.fetch("/api/auth/users"),
+                Auth.fetch("/api/library"),
+                Auth.fetch("/metrics"),
+                Auth.fetch("/api/evaluate/history"),
+            ]);
+            const users = usersRes.ok ? await usersRes.json() : [];
+            const lib   = libRes.ok ? await libRes.json() : { documents: [], total_documents: 0, total_chunks: 0 };
+            const metricsText = metricsRes.ok ? await metricsRes.text() : "";
+            const evalHistory = evalRes.ok ? await evalRes.json() : [];
+            const samples = parsePrometheusMetrics(metricsText);
+            const docs = lib.documents || [];
+
+            // --- Stat cards -------------------------------------------------
+            const totalStorage = docs.reduce((a, d) => a + (d.size_bytes || 0), 0);
+            const totalRequests = sumSamples(samples, "rag_http_requests_total");
+            const totalErrors   = sumSamples(samples, "rag_http_errors_total");
+            const activeUsers   = sumSamples(samples, "rag_active_users");
+            const activeConvos  = sumSamples(samples, "rag_active_conversations");
+
+            document.getElementById("admin-stats-grid").innerHTML = "";
+            renderAdminStatCard("fa-users",        "#818CF8", "Total Users",         users.length,        v => Math.round(v));
+            renderAdminStatCard("fa-user-check",   "#10B981", "Active Sessions",     activeUsers,         v => Math.round(v), "users, last 5 min");
+            renderAdminStatCard("fa-comments",     "#60A5FA", "Active Conversations",activeConvos,        v => Math.round(v), "last 5 min");
+            renderAdminStatCard("fa-file-lines",   "#C084FC", "Total Documents",     lib.total_documents ?? docs.length, v => Math.round(v));
+            renderAdminStatCard("fa-cubes",        "#F59E0B", "Total Chunks",        lib.total_chunks ?? 0, v => Math.round(v));
+            renderAdminStatCard("fa-hard-drive",   "#EF4444", "Storage Used",        totalStorage,        v => formatBytes(v));
+            renderAdminStatCard("fa-server",       "#10B981", "API Requests",        totalRequests,       v => Math.round(v).toLocaleString());
+            renderAdminStatCard("fa-triangle-exclamation", "#EF4444", "Server Errors (5xx)", totalErrors, v => Math.round(v));
+
+            // --- Charts -------------------------------------------------------
+            const typeCounts = {};
+            docs.forEach(d => { typeCounts[d.file_type] = (typeCounts[d.file_type] || 0) + 1; });
+            if (adminDocsChart) adminDocsChart.destroy();
+            adminDocsChart = new Chart(document.getElementById("adminDocsChart").getContext("2d"), {
+                type: "doughnut",
+                data: {
+                    labels: Object.keys(typeCounts).map(t => `.${t}`),
+                    datasets: [{ data: Object.values(typeCounts), backgroundColor: CHART_COLORS, borderWidth: 0 }],
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { position: "bottom", labels: { color: "#9CA3AF", boxWidth: 10, font: { family: "Plus Jakarta Sans", size: 11 } } } },
+                },
+            });
+
+            const pathTotals = {};
+            findSamples(samples, "rag_http_requests_total").forEach(s => {
+                pathTotals[s.labels.path || "?"] = (pathTotals[s.labels.path || "?"] || 0) + s.value;
+            });
+            const topPaths = Object.entries(pathTotals).sort((a, b) => b[1] - a[1]).slice(0, 6);
+            if (adminApiChart) adminApiChart.destroy();
+            adminApiChart = new Chart(document.getElementById("adminApiChart").getContext("2d"), {
+                type: "bar",
+                data: {
+                    labels: topPaths.map(([p]) => p),
+                    datasets: [{ data: topPaths.map(([, v]) => v), backgroundColor: "#818CF8", borderRadius: 6 }],
+                },
+                options: {
+                    indexAxis: "y", responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { grid: { color: "rgba(255,255,255,0.03)" }, ticks: { color: "#6B7280" } },
+                        y: { grid: { display: false }, ticks: { color: "#6B7280", font: { size: 10 } } },
+                    },
+                },
+            });
+
+            const roleCounts = users.reduce((acc, u) => { acc[u.role] = (acc[u.role] || 0) + 1; return acc; }, {});
+            if (adminUsersChart) adminUsersChart.destroy();
+            adminUsersChart = new Chart(document.getElementById("adminUsersChart").getContext("2d"), {
+                type: "doughnut",
+                data: {
+                    labels: Object.keys(roleCounts),
+                    datasets: [{ data: Object.values(roleCounts), backgroundColor: ["#F59E0B", "#818CF8"], borderWidth: 0 }],
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { position: "bottom", labels: { color: "#9CA3AF", boxWidth: 10, font: { family: "Plus Jakarta Sans", size: 11 } } } },
+                },
+            });
+
+            // --- API usage detail chips ---------------------------------------
+            const cacheHit  = sumSamples(samples, "rag_semantic_cache_events_total", { result: "hit" });
+            const cacheMiss = sumSamples(samples, "rag_semantic_cache_events_total", { result: "miss" });
+            const cacheRatio = (cacheHit + cacheMiss) > 0 ? (cacheHit / (cacheHit + cacheMiss)) * 100 : null;
+            const meanLatency = (metric) => {
+                const sum = sumSamples(samples, `${metric}_sum`);
+                const count = sumSamples(samples, `${metric}_count`);
+                return count > 0 ? sum / count : null;
+            };
+            const errorRate = totalRequests > 0 ? (totalErrors / totalRequests) * 100 : 0;
+
+            const chips = [
+                { label: "Error Rate", value: `${errorRate.toFixed(2)}%`, cls: errorRate > 5 ? "chip-bad" : errorRate > 1 ? "chip-warn" : "chip-good" },
+                { label: "Cache Hit Ratio", value: cacheRatio !== null ? `${cacheRatio.toFixed(1)}%` : "—", cls: cacheRatio >= 50 ? "chip-good" : "chip-warn" },
+                { label: "Avg Retrieval", value: meanLatency("rag_retrieval_seconds") !== null ? `${(meanLatency("rag_retrieval_seconds") * 1000).toFixed(0)} ms` : "—" },
+                { label: "Avg Rerank", value: meanLatency("rag_rerank_seconds") !== null ? `${(meanLatency("rag_rerank_seconds") * 1000).toFixed(0)} ms` : "—" },
+                { label: "Avg LLM", value: meanLatency("rag_llm_seconds") !== null ? `${meanLatency("rag_llm_seconds").toFixed(2)} s` : "—" },
+                { label: "Uploads Total", value: Math.round(sumSamples(samples, "rag_uploads_total")).toLocaleString() },
+            ];
+            document.getElementById("admin-api-chips").innerHTML = chips.map(c => `
+                <div class="admin-api-chip ${c.cls || ""}">
+                    <span class="chip-label">${escapeHTML(c.label)}</span>
+                    <span class="chip-value">${escapeHTML(c.value)}</span>
+                </div>`).join("");
+
+            // --- Users table ----------------------------------------------------
+            const usersTbody = document.getElementById("admin-users-tbody");
+            usersTbody.innerHTML = users.length === 0
+                ? `<tr><td colspan="5" class="text-center">No users found.</td></tr>`
+                : users.map(u => `
+                    <tr>
+                        <td>${escapeHTML(u.full_name)}</td>
+                        <td>${escapeHTML(u.email)}</td>
+                        <td><span class="tag ${u.role === "admin" ? "conf-mid" : ""}">${escapeHTML(u.role)}</span></td>
+                        <td><span class="tag ${u.is_active ? "conf-high" : "conf-low"}">${u.is_active ? "Active" : "Disabled"}</span></td>
+                        <td>${escapeHTML(formatDate(new Date(u.created_at).getTime() / 1000))}</td>
+                    </tr>`).join("");
+
+            // --- Recent Activity feed (real events: uploads + eval runs) -------
+            const events = [];
+            docs.forEach(d => {
+                events.push({
+                    ts: new Date(d.uploaded_at).getTime(),
+                    type: d.status === "failed" ? "failed" : d.status === "completed" ? "completed" : "upload",
+                    html: `<strong>${escapeHTML(d.uploaded_by_name || "Someone")}</strong> uploaded <strong>${escapeHTML(d.filename)}</strong>${d.status === "failed" ? " — indexing failed" : ""}`,
+                });
+            });
+            evalHistory.forEach(run => {
+                events.push({
+                    ts: run.timestamp * 1000,
+                    type: "eval",
+                    html: `Evaluation run completed — <strong>${(run.mean_retrieval_recall * 100).toFixed(0)}%</strong> recall, <strong>${run.mean_latency.toFixed(1)}s</strong> latency`,
+                });
+            });
+            events.sort((a, b) => b.ts - a.ts);
+            const feed = document.getElementById("admin-activity-feed");
+            feed.innerHTML = events.length === 0
+                ? `<p class="admin-empty-note">No activity recorded yet.</p>`
+                : events.slice(0, 15).map(e => `
+                    <div class="activity-item">
+                        <div class="activity-icon ${activityIcon(e.type)}"><i class="fa-solid ${activityIcon(e.type).split(" ")[1]}"></i></div>
+                        <div class="activity-text">${e.html}</div>
+                        <span class="activity-time">${relTime(e.ts)}</span>
+                    </div>`).join("");
+
+        } catch (err) {
+            console.error("Failed to load admin dashboard:", err);
+        }
+    }
+
+    const adminRefreshBtn = document.getElementById("admin-refresh-btn");
+    if (adminRefreshBtn) adminRefreshBtn.addEventListener("click", loadAdminDashboard);
 
     // ----------------------------------------------------------------
     // 4. KNOWLEDGE LIBRARY
@@ -2236,11 +2558,24 @@ document.addEventListener("DOMContentLoaded", () => {
     const uploadSection   = document.querySelector(".upload-section");
 
     function applyRoleVisibility() {
-        // Admin-only controls: document upload and evaluation trigger.
-        // The backend enforces this with 403s regardless of what the UI shows.
+        // Admin-only controls: document upload, evaluation trigger, and the
+        // Admin Dashboard tab. The backend enforces this with 403s on the
+        // underlying endpoints regardless of what the UI shows.
         const isAdmin = Auth.isAdmin();
         if (uploadSection) uploadSection.style.display = isAdmin ? "" : "none";
         if (runEvalButton) runEvalButton.style.display = isAdmin ? "" : "none";
+        const adminNavBtn = document.getElementById("admin-nav-btn");
+        if (adminNavBtn) {
+            adminNavBtn.style.display = isAdmin ? "" : "none";
+            // A non-admin whose role changed (or a stale session) should
+            // never stay parked on the admin tab — fall back to chat.
+            if (!isAdmin && adminNavBtn.classList.contains("active")) {
+                adminNavBtn.classList.remove("active");
+                document.getElementById("admin-tab").classList.remove("active");
+                document.querySelector('.nav-btn[data-tab="chat-tab"]').classList.add("active");
+                document.getElementById("chat-tab").classList.add("active");
+            }
+        }
     }
 
     function startApp(user) {
