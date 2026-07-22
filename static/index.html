@@ -12,9 +12,11 @@
     <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="/static/index.css">
+    <link rel="stylesheet" href="/static/index.css?v=phasec1">
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Mammoth.js — client-side DOCX -> HTML conversion for the Knowledge Library preview -->
+    <script src="https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js" defer></script>
 </head>
 <body>
     <!-- Authentication Overlay (JWT login / signup) -->
@@ -365,12 +367,53 @@
                                 <span class="library-stat-chip" title="Total indexed chunks">
                                     <i class="fa-solid fa-cubes"></i> <strong id="chunk-counter">0</strong> chunks
                                 </span>
+                                <span class="library-stat-chip library-stat-chip--muted" id="library-filtered-count" title="Documents matching current filters" style="display:none;"></span>
                             </div>
                             <div class="library-search-wrap">
                                 <i class="fa-solid fa-magnifying-glass"></i>
                                 <input type="search" id="library-search" placeholder="Search documents…" maxlength="100" autocomplete="off">
                             </div>
                         </div>
+
+                        <div class="library-toolbar">
+                            <div class="library-toolbar-group">
+                                <label class="toolbar-label" for="library-filter-type">Type</label>
+                                <select id="library-filter-type" class="toolbar-select">
+                                    <option value="all">All types</option>
+                                    <option value="md">Markdown</option>
+                                    <option value="txt">Text</option>
+                                    <option value="pdf">PDF</option>
+                                    <option value="docx">DOCX</option>
+                                </select>
+                                <label class="toolbar-label" for="library-filter-status">Status</label>
+                                <select id="library-filter-status" class="toolbar-select">
+                                    <option value="all">All statuses</option>
+                                    <option value="completed">Indexed</option>
+                                    <option value="processing">Processing</option>
+                                    <option value="failed">Failed</option>
+                                </select>
+                                <label class="toolbar-label" for="library-sort">Sort</label>
+                                <select id="library-sort" class="toolbar-select">
+                                    <option value="date-desc">Newest first</option>
+                                    <option value="date-asc">Oldest first</option>
+                                    <option value="name-asc">Name A–Z</option>
+                                    <option value="name-desc">Name Z–A</option>
+                                    <option value="size-desc">Largest first</option>
+                                    <option value="size-asc">Smallest first</option>
+                                    <option value="chunks-desc">Most chunks</option>
+                                    <option value="chunks-asc">Fewest chunks</option>
+                                </select>
+                            </div>
+                            <div class="library-view-toggle" role="group" aria-label="Library layout">
+                                <button type="button" class="view-toggle-btn active" id="library-view-grid" aria-pressed="true" title="Grid view">
+                                    <i class="fa-solid fa-grip"></i>
+                                </button>
+                                <button type="button" class="view-toggle-btn" id="library-view-list" aria-pressed="false" title="List view">
+                                    <i class="fa-solid fa-list"></i>
+                                </button>
+                            </div>
+                        </div>
+
                         <div class="docs-grid" id="documents-grid-container">
                             <!-- Document cards will render here -->
                         </div>
@@ -406,6 +449,55 @@
             </div>
         </div>
     </div>
+    <!-- Document Preview Modal (Knowledge Library) -->
+    <div class="modal" id="doc-preview-modal">
+        <div class="modal-content preview-modal-content" id="preview-modal-content">
+            <header class="modal-header preview-modal-header">
+                <div class="preview-title-wrap">
+                    <i class="fa-solid fa-file preview-title-icon" id="preview-file-icon"></i>
+                    <h3 id="preview-doc-title">Document</h3>
+                </div>
+                <div class="preview-toolbar">
+                    <div class="preview-zoom-group" role="group" aria-label="Zoom">
+                        <button type="button" class="preview-tool-btn" id="preview-zoom-out" title="Zoom out" aria-label="Zoom out"><i class="fa-solid fa-minus"></i></button>
+                        <span class="preview-zoom-label" id="preview-zoom-label">100%</span>
+                        <button type="button" class="preview-tool-btn" id="preview-zoom-in" title="Zoom in" aria-label="Zoom in"><i class="fa-solid fa-plus"></i></button>
+                    </div>
+                    <button type="button" class="preview-tool-btn" id="preview-fullscreen-btn" title="Toggle fullscreen" aria-label="Toggle fullscreen"><i class="fa-solid fa-expand"></i></button>
+                    <button class="close-modal-btn" id="close-preview-modal-btn" aria-label="Close preview"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+            </header>
+            <div class="modal-body preview-modal-body">
+                <div class="preview-main" id="preview-main">
+                    <div class="preview-loading" id="preview-loading">
+                        <div class="skeleton" style="height:20px; width:60%; margin-bottom:12px;"></div>
+                        <div class="skeleton" style="height:14px; width:90%; margin-bottom:8px;"></div>
+                        <div class="skeleton" style="height:14px; width:80%; margin-bottom:8px;"></div>
+                        <div class="skeleton" style="height:14px; width:85%;"></div>
+                    </div>
+                    <div class="preview-content-wrap" id="preview-content-wrap" style="display:none;"></div>
+                    <div class="preview-error-state" id="preview-error-state" style="display:none;">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                        <p id="preview-error-text">Could not load this document.</p>
+                    </div>
+                </div>
+                <aside class="preview-sidebar">
+                    <div class="preview-meta-block">
+                        <span class="section-title">Document Info</span>
+                        <div class="citation-meta-grid" id="preview-meta-grid"></div>
+                    </div>
+                    <div class="preview-meta-block" id="preview-chunks-block" style="display:none;">
+                        <span class="section-title">Retrieved In This Session</span>
+                        <div class="preview-chunk-list" id="preview-chunk-list"></div>
+                    </div>
+                    <button type="button" class="action-btn-secondary preview-download-btn" id="preview-download-btn">
+                        <i class="fa-solid fa-download"></i> Download Original
+                    </button>
+                </aside>
+            </div>
+        </div>
+    </div>
+
     <!-- Profile Modal -->
     <div class="modal" id="profile-modal">
         <div class="modal-content profile-modal-content">
@@ -452,7 +544,10 @@
     </div>
 
     <!-- Custom JS -->
-    <script src="/static/auth.js" defer></script>
-    <script src="/static/app.js" defer></script>
+    <!-- Cache-busting query params: bump on every static asset change so
+         browsers with heuristic caching (no explicit Cache-Control from the
+         server) never serve a stale app.js/index.css after a deploy. -->
+    <script src="/static/auth.js?v=phasec2" defer></script>
+    <script src="/static/app.js?v=phasec2" defer></script>
 </body>
 </html>
