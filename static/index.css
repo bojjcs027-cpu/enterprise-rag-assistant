@@ -761,6 +761,7 @@ h1, h2, h3, h4, h5, h6 {
 .metric-card:hover {
     border-color: var(--border-glow);
     box-shadow: var(--shadow-glow);
+    transform: translateY(-3px);
 }
 
 .metric-card .card-label {
@@ -2427,7 +2428,13 @@ button:focus:not(:focus-visible), input:focus:not(:focus-visible) { outline: non
 .msg-bubble, .doc-content-block, .debug-card .content { overflow-wrap: anywhere; }
 
 /* NOTE: no scroll-behavior:smooth on .chat-history — smooth animation makes
-   the per-chunk auto-scroll lag behind streamed responses. */
+   the per-chunk auto-scroll lag behind streamed responses. Other scroll
+   containers don't receive programmatic per-frame scrolling, so smooth
+   scrolling is safe there. */
+.debug-container, .column-body, .citation-chunk-text, .preview-sidebar,
+.admin-activity-feed, .docs-container, .doc-content-block, .table-container {
+    scroll-behavior: smooth;
+}
 
 /* Uniform border-radius rhythm on interactive chips */
 .prompt-chip, .library-stat-chip, .tag { border-radius: 8px; }
@@ -3274,7 +3281,7 @@ button:focus:not(:focus-visible), input:focus:not(:focus-visible) { outline: non
     gap: 4px;
     transition: box-shadow 0.3s ease, border-color 0.3s ease;
 }
-.gauge-card:hover { box-shadow: var(--shadow-md); border-color: var(--border-glow); }
+.gauge-card:hover { box-shadow: var(--shadow-md); border-color: var(--border-glow); transform: translateY(-3px); }
 .gauge-svg-wrap svg { display: block; }
 .gauge-svg-wrap .gauge-value-text {
     font-family: 'Outfit', sans-serif;

@@ -15,6 +15,9 @@ data/chat_history.db
 data/semantic_cache.pkl
 data/eval_history.json
 
+# run_project.bat's one-time dependency-install marker
+.deps_installed
+
 # OS / editor noise
 desktop.ini
 Thumbs.db
