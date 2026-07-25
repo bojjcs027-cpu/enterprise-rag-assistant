@@ -230,7 +230,7 @@ class RAGChain:
         if provider == "gemini" and config.GEMINI_API_KEY:
             print("[RAGChain] Using Gemini API for generation.")
             return ChatGoogleGenerativeAI(
-                model="gemini-1.5-flash",
+                model="gemini-flash-latest",
                 google_api_key=config.GEMINI_API_KEY,
                 temperature=0.1,
             )
@@ -506,7 +506,7 @@ class RAGChain:
         if provider == "claude":
             return config.ANTHROPIC_MODEL
         if provider == "gemini":
-            return "gemini-1.5-flash"
+            return "gemini-flash-latest"
         if provider == "openai":
             return "gpt-4o-mini"
         if provider == "extractive_fallback":

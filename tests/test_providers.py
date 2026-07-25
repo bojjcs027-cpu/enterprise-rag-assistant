@@ -50,6 +50,6 @@ class TestProviderSelection:
     def test_model_name_reporting(self, chain, monkeypatch):
         monkeypatch.setattr(config, "ANTHROPIC_MODEL", "claude-opus-4-8")
         assert chain._llm_model_name("claude") == "claude-opus-4-8"
-        assert chain._llm_model_name("gemini") == "gemini-1.5-flash"
+        assert chain._llm_model_name("gemini") == "gemini-flash-latest"
         assert chain._llm_model_name("openai") == "gpt-4o-mini"
         assert "no LLM" in chain._llm_model_name("extractive_fallback")
