@@ -27,6 +27,11 @@ LOCAL_LLM_MODEL = os.getenv("LOCAL_LLM_MODEL", "google/flan-t5-base")
 # Embedding and Reranking Configurations
 EMBEDDING_MODEL_NAME = os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
 RERANK_MODEL_NAME = os.getenv("RERANK_MODEL", "cross-encoder/ms-marco-MiniLM-L-6-v2")
+# Reranker loads a second transformer model on top of the embedding model.
+# On memory-constrained hosts (e.g. Render free tier, 512MB) this is enough
+# to OOM the process during startup. Default off; set ENABLE_RERANKER=true
+# on hosts with enough RAM to use it.
+ENABLE_RERANKER = os.getenv("ENABLE_RERANKER", "false").lower() == "true"
 
 # Chunking configurations
 CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", 500))

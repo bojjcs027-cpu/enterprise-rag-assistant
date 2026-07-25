@@ -39,7 +39,10 @@ async def lifespan(app: FastAPI):
         await run_in_threadpool(retriever.retriever_instance.initialize)
         if config.LLM_PROVIDER == "local":
             await run_in_threadpool(chain.rag_chain_instance._get_local_llm)
-        await run_in_threadpool(retriever.reranker_instance.initialize)
+        if config.ENABLE_RERANKER:
+            await run_in_threadpool(retriever.reranker_instance.initialize)
+        else:
+            logger.info("Reranker disabled (ENABLE_RERANKER=false) — skipping load to save memory.")
         # Reconcile library metadata with files on disk (registers seed docs,
         # drops stale rows, refreshes chunk counts).
         await run_in_threadpool(library_service.sync_filesystem)

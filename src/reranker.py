@@ -32,6 +32,11 @@ class DocumentReranker:
         if not hybrid_results:
             return []
 
+        if not config.ENABLE_RERANKER:
+            for item in hybrid_results:
+                item["rerank_score"] = float(item["score"])
+            return hybrid_results[:top_k]
+
         self.initialize()
 
         # If the model failed to load, pass through the hybrid results directly (limited to top_k)
